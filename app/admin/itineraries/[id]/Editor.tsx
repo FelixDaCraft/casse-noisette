@@ -11,6 +11,7 @@ import {
   renameItinerary,
   deleteItinerary,
 } from '../../actions';
+import { MAX_PANELS } from '@/lib/maps';
 
 type P = { id: string; name: string; lat: number; lng: number };
 
@@ -24,7 +25,9 @@ export default function Editor({
   const router = useRouter();
   const [name, setName] = useState(itinerary.name);
   const [panels, setPanels] = useState<P[]>(itinerary.panels);
+  const [notice, setNotice] = useState('');
   const [, start] = useTransition();
+  const full = panels.length >= MAX_PANELS;
 
   const mapEl = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
@@ -98,9 +101,15 @@ export default function Editor({
   }
 
   function onAdd(lat: number, lng: number) {
+    if (panelsRef.current.length >= MAX_PANELS) {
+      setNotice(`Limite de ${MAX_PANELS} panneaux atteinte (limite Google Maps).`);
+      return;
+    }
+    setNotice('');
     start(async () => {
       const created = await addPanel(itinerary.id, round(lat), round(lng));
       if (created) setPanels((prev) => [...prev, created]);
+      else setNotice(`Limite de ${MAX_PANELS} panneaux atteinte (limite Google Maps).`);
     });
   }
   function onMoveCoord(id: string, lat: number, lng: number) {
@@ -168,9 +177,21 @@ export default function Editor({
         </button>
       </div>
 
+      <div className="row" style={{ margin: '4px 0' }}>
+        <span className={'badge' + (full ? ' warn' : '')}>
+          {panels.length} / {MAX_PANELS} panneaux
+        </span>
+        {notice && <span className="err" style={{ margin: 0 }}>{notice}</span>}
+      </div>
       <p className="muted" style={{ fontSize: '.85rem' }}>
-        Clique sur la carte pour <b>ajouter</b> un panneau · glisse un marqueur pour le{' '}
-        <b>déplacer</b>. L&apos;ordre des panneaux ci-dessous = l&apos;ordre de la tournée.
+        {full ? (
+          <>Limite de {MAX_PANELS} panneaux atteinte (limite Google Maps). Supprime-en un pour en ajouter un autre.</>
+        ) : (
+          <>
+            Clique sur la carte pour <b>ajouter</b> un panneau · glisse un marqueur pour le{' '}
+            <b>déplacer</b>. L&apos;ordre des panneaux ci-dessous = l&apos;ordre de la tournée.
+          </>
+        )}
       </p>
 
       <div className="editor">

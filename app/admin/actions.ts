@@ -7,6 +7,7 @@ import { requireAdmin, makeToken, ADMIN_COOKIE, SESSION_TTL_SECONDS } from '@/li
 import { hashPassword, verifyPassword } from '@/lib/password';
 import { sendMail } from '@/lib/mail';
 import { makeResetToken, hashResetToken } from '@/lib/reset';
+import { MAX_PANELS } from '@/lib/maps';
 
 function revalAll(itineraryId?: string) {
   revalidatePath('/');
@@ -62,14 +63,18 @@ export async function requestReset(
     });
     const base = process.env.NEXT_PUBLIC_SITE_URL || '';
     const link = `${base}/admin/reset?token=${raw}`;
-    await sendMail(
-      admin.email,
-      'Réinitialisation de ton mot de passe — Casse-Noisette',
-      `<p>Une réinitialisation de mot de passe a été demandée pour le backoffice Casse-Noisette.</p>
-       <p><a href="${link}">Clique ici pour choisir un nouveau mot de passe</a> (lien valable 1 heure).</p>
-       <p>Si tu n’es pas à l’origine de cette demande, ignore cet email.</p>`,
-      `Réinitialise ton mot de passe (lien valable 1h) : ${link}`,
-    );
+    try {
+      await sendMail(
+        admin.email,
+        'Réinitialisation de ton mot de passe — Casse-Noisette',
+        `<p>Une réinitialisation de mot de passe a été demandée pour le backoffice Casse-Noisette.</p>
+         <p><a href="${link}">Clique ici pour choisir un nouveau mot de passe</a> (lien valable 1 heure).</p>
+         <p>Si tu n’es pas à l’origine de cette demande, ignore cet email.</p>`,
+        `Réinitialise ton mot de passe (lien valable 1h) : ${link}`,
+      );
+    } catch (e) {
+      console.error('[reset] échec envoi email:', e);
+    }
   }
   return generic;
 }
@@ -137,6 +142,9 @@ export async function moveItinerary(id: string, dir: 'up' | 'down') {
 
 export async function addPanel(itineraryId: string, lat: number, lng: number, name?: string) {
   await requireAdmin();
+  // Limite Google Maps : 10 arrêts par itinéraire (garde côté serveur).
+  const count = await prisma.panel.count({ where: { itineraryId } });
+  if (count >= MAX_PANELS) return null;
   const max = await prisma.panel.aggregate({ where: { itineraryId }, _max: { position: true } });
   const panel = await prisma.panel.create({
     data: {

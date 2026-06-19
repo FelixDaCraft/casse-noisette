@@ -1,5 +1,8 @@
 // Construction des liens de navigation (utilisable côté client et serveur).
 
+/** Nombre max de panneaux par itinéraire (limite Google Maps : 10 arrêts). */
+export const MAX_PANELS = 10;
+
 export type Mode = 'walking' | 'bicycling' | 'driving';
 export type Coord = { lat: number; lng: number };
 
