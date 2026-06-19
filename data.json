@@ -1,0 +1,778 @@
+[
+  {
+    "itineraire": "Panneaux d'affichage libre",
+    "nbPoints": 94,
+    "points": [
+      {
+        "name": "Route de Vertou",
+        "latlng": "47.1864277989914,-1.52786667608291"
+      },
+      {
+        "name": "Rue du Château de Rezé",
+        "latlng": "47.180737790747,-1.55985729672909"
+      },
+      {
+        "name": "Rue Georges Guynemer",
+        "latlng": "47.1823178060064,-1.57974006268799"
+      },
+      {
+        "name": "Rue Pasteur",
+        "latlng": "47.1858541996994,-1.58068158611287"
+      },
+      {
+        "name": "Route de la Gendronnerie",
+        "latlng": "47.1269294609688,-1.64025586237504"
+      },
+      {
+        "name": "Rue du Stade",
+        "latlng": "47.1489286168569,-1.6952379642294"
+      },
+      {
+        "name": "Avenue de Plaisance",
+        "latlng": "47.1419611140827,-1.68941216685856"
+      },
+      {
+        "name": "Rue de la Libération",
+        "latlng": "47.2004226143737,-1.52654768421807"
+      },
+      {
+        "name": "Quai Léon Sécher",
+        "latlng": "47.1827777787857,-1.53173829355193"
+      },
+      {
+        "name": "Rue de la Gourdonnière",
+        "latlng": "47.1635111049261,-1.55393955237603"
+      },
+      {
+        "name": "Allée de Touraine",
+        "latlng": "47.1860381610512,-1.55599574834666"
+      },
+      {
+        "name": "Rue des Sencives",
+        "latlng": "47.1741047858311,-1.60267818958746"
+      },
+      {
+        "name": "Rue Jean Baptiste Robert",
+        "latlng": "47.2094104876523,-1.50907697158528"
+      },
+      {
+        "name": "Rue Célestin Freinet",
+        "latlng": "47.1810658143099,-1.58796217133379"
+      },
+      {
+        "name": "Rue de la Pierre",
+        "latlng": "47.1841006194648,-1.59775028680159"
+      },
+      {
+        "name": "Rue des Roseaux",
+        "latlng": "47.1878023800739,-1.66577243576733"
+      },
+      {
+        "name": "Rue des Drouards",
+        "latlng": "47.1571469087917,-1.56810509315675"
+      },
+      {
+        "name": "Rue de Pornic",
+        "latlng": "47.1435510186402,-1.69582329232912"
+      },
+      {
+        "name": "Route de l'Halbrandière",
+        "latlng": "47.1207383877628,-1.61786417459209"
+      },
+      {
+        "name": "Rue Charles Lindbergh",
+        "latlng": "47.1550823774741,-1.59844027696315"
+      },
+      {
+        "name": "Rue de la Gilarderie",
+        "latlng": "47.1873006740797,-1.51880212589886"
+      },
+      {
+        "name": "Allée de la Civelière",
+        "latlng": "47.1883960359412,-1.52192145291751"
+      },
+      {
+        "name": "Quai Surcouf",
+        "latlng": "47.1949135025756,-1.57826366595785"
+      },
+      {
+        "name": "Place François Mitterrand",
+        "latlng": "47.184495145344,-1.5594843696873"
+      },
+      {
+        "name": "Avenue de la Martellière",
+        "latlng": "47.1996556942029,-1.52020566207853"
+      },
+      {
+        "name": "Chemin du Couvent",
+        "latlng": "47.1871843098098,-1.58680796590864"
+      },
+      {
+        "name": "Place de la Mairie",
+        "latlng": "47.1695972078096,-1.72237336331991"
+      },
+      {
+        "name": "Rue des Coteaux",
+        "latlng": "47.1842410574932,-1.66958808990381"
+      },
+      {
+        "name": "Route de Bouguenais",
+        "latlng": "47.1530869421938,-1.66213208945288"
+      },
+      {
+        "name": "Place du 8 Mai 1945",
+        "latlng": "47.1894068876646,-1.55195492366174"
+      },
+      {
+        "name": "Côte Saint Sébastien",
+        "latlng": "47.200513696284,-1.53410379849895"
+      },
+      {
+        "name": "Rue Bonne Garde",
+        "latlng": "47.1961074027962,-1.52781429395781"
+      },
+      {
+        "name": "Route de Vertou",
+        "latlng": "47.1900324638724,-1.53283565650094"
+      },
+      {
+        "name": "Rue du Château de Rezé",
+        "latlng": "47.1845068443039,-1.56317384864828"
+      },
+      {
+        "name": "Rue des Déportés",
+        "latlng": "47.1785407116838,-1.54633083750752"
+      },
+      {
+        "name": "Rue des Brêches",
+        "latlng": "47.1955038063668,-1.560354787041"
+      },
+      {
+        "name": "Rue de la Maillardière",
+        "latlng": "47.1679228696272,-1.52564659491283"
+      },
+      {
+        "name": "Rue Henri Barbusse",
+        "latlng": "47.190912036941,-1.56323130274262"
+      },
+      {
+        "name": "Rue Jean Baptiste Vigier",
+        "latlng": "47.1853769429687,-1.53614056962766"
+      },
+      {
+        "name": "Route de Clisson",
+        "latlng": "47.1890991,-1.5080433"
+      },
+      {
+        "name": "Rue de Galheur",
+        "latlng": "47.16387397711,-1.57833855192297"
+      },
+      {
+        "name": "Rue de la Bouguinière",
+        "latlng": "47.1731235679817,-1.63544400332141"
+      },
+      {
+        "name": "Rue des Quarterons",
+        "latlng": "47.1290671932641,-1.64069166678686"
+      },
+      {
+        "name": "Route des Ecobuts",
+        "latlng": "47.1438194229922,-1.63109310997216"
+      },
+      {
+        "name": "Rue de la Ripossière",
+        "latlng": "47.1920462992824,-1.53440325611274"
+      },
+      {
+        "name": "Route de Saint Sébastien",
+        "latlng": "47.1995642948061,-1.53114380917919"
+      },
+      {
+        "name": "Rue de la Galarnière",
+        "latlng": "47.1777560883786,-1.55887817063366"
+      },
+      {
+        "name": "Rue Maurice Lagathu",
+        "latlng": "47.180329104286,-1.53652844684393"
+      },
+      {
+        "name": "Rue du Vivier",
+        "latlng": "47.1650761351819,-1.54227960863241"
+      },
+      {
+        "name": "Rue de la Vallée",
+        "latlng": "47.1771936240932,-1.52192246164333"
+      },
+      {
+        "name": "Rue Guy Le Lan",
+        "latlng": "47.1866723166645,-1.54502018687097"
+      },
+      {
+        "name": "Rue du Général De Gaulle",
+        "latlng": "47.2078956956228,-1.49648039378463"
+      },
+      {
+        "name": "Rue de la Jaunaie",
+        "latlng": "47.1919910889618,-1.49697986236138"
+      },
+      {
+        "name": "Rue de Beau Soleil",
+        "latlng": "47.1782888854957,-1.64836409543231"
+      },
+      {
+        "name": "Rue de la Couillauderie",
+        "latlng": "47.165529440807,-1.6343562102849"
+      },
+      {
+        "name": "Rue de la Gagnerie",
+        "latlng": "47.1700033876085,-1.62048461850353"
+      },
+      {
+        "name": "Rue de la Pagerie",
+        "latlng": "47.1796148535265,-1.6430991208695"
+      },
+      {
+        "name": "Route de la Blanchardais",
+        "latlng": "47.1399953697357,-1.61395220833539"
+      },
+      {
+        "name": "Rue de La Matrasserie",
+        "latlng": "47.1728833326656,-1.64297504462597"
+      },
+      {
+        "name": "Rue Maurice Lagathu",
+        "latlng": "47.1821083715313,-1.53822081912362"
+      },
+      {
+        "name": "Rue des Poyaux",
+        "latlng": "47.1638409110044,-1.52859327668578"
+      },
+      {
+        "name": "Place Alfred Radigois",
+        "latlng": "47.1933990535732,-1.5176935893776"
+      },
+      {
+        "name": "Rue de la Haie d'Ancheteau",
+        "latlng": "47.1828011705612,-1.67086241066201"
+      },
+      {
+        "name": "Rue Georges Clémenceau",
+        "latlng": "47.175162248828,-1.57840307887341"
+      },
+      {
+        "name": "Rue Salvador Allende",
+        "latlng": "47.1718695379166,-1.62416414187568"
+      },
+      {
+        "name": "Rue Saint Jacques",
+        "latlng": "47.1965739858964,-1.53881431961194"
+      },
+      {
+        "name": "Rue Gabriel Goudy",
+        "latlng": "47.1949383305351,-1.54000367553003"
+      },
+      {
+        "name": "Rue des Fromenteaux",
+        "latlng": "47.1879559719124,-1.52543259693177"
+      },
+      {
+        "name": "Rue Jean Fraix",
+        "latlng": "47.1859618573631,-1.54220341982035"
+      },
+      {
+        "name": "Rue Jean Jaurès",
+        "latlng": "47.1857893858978,-1.54656593189134"
+      },
+      {
+        "name": "Rue de l'Aviation",
+        "latlng": "47.1611081896514,-1.58735413483474"
+      },
+      {
+        "name": "Avenue du Général De Gaulle",
+        "latlng": "47.1778823724234,-1.61917506418058"
+      },
+      {
+        "name": "Place des Pêcheurs",
+        "latlng": "47.1365605988937,-1.66928567244603"
+      },
+      {
+        "name": "Rue de la Mouchonnerie",
+        "latlng": "47.1750745006688,-1.65768886525096"
+      },
+      {
+        "name": "Rue des Pêcheurs",
+        "latlng": "47.1866368677013,-1.63433263840565"
+      },
+      {
+        "name": "Rue Eugène Pottier",
+        "latlng": "47.1785559896596,-1.62835659302388"
+      },
+      {
+        "name": "Route du Champ de Foire",
+        "latlng": "47.1247054495465,-1.61853959378723"
+      },
+      {
+        "name": "Boulevard Jean Monnet",
+        "latlng": "47.1338892,-1.6461433"
+      },
+      {
+        "name": "Rue Ambroise Pierre Audouard",
+        "latlng": "47.1884756169553,-1.52614738091072"
+      },
+      {
+        "name": "Rue de la Ravardière",
+        "latlng": "47.1835789464958,-1.66206240460436"
+      },
+      {
+        "name": "Rue Gabriel Goudy",
+        "latlng": "47.1961500834393,-1.54146571598514"
+      },
+      {
+        "name": "Rue Ordronneau",
+        "latlng": "47.1913948551586,-1.58456638219459"
+      },
+      {
+        "name": "Rue du Château de Rezé",
+        "latlng": "47.1807486912403,-1.55987532617355"
+      },
+      {
+        "name": "Rue des Hucasseries",
+        "latlng": "47.1757944868252,-1.53450968153819"
+      },
+      {
+        "name": "Avenue Léon Blum",
+        "latlng": "47.1829251723394,-1.56980999442047"
+      },
+      {
+        "name": "Rue de la Robinière",
+        "latlng": "47.1651220893096,-1.53368546968984"
+      },
+      {
+        "name": "Rue de la Basse Lande",
+        "latlng": "47.1807141345907,-1.54061189479041"
+      },
+      {
+        "name": "Rue de Beaugency",
+        "latlng": "47.2038729563512,-1.4917783111489"
+      },
+      {
+        "name": "Avenue de Glinde",
+        "latlng": "47.2088988387389,-1.48905825818958"
+      },
+      {
+        "name": "Rue de la Fontaine",
+        "latlng": "47.2017201929915,-1.49388094961181"
+      },
+      {
+        "name": "Avenue de Montréal",
+        "latlng": "47.1985018929992,-1.48746615870219"
+      },
+      {
+        "name": "Rue de la Bauche Bertin",
+        "latlng": "47.1582528711321,-1.64584005842982"
+      },
+      {
+        "name": "Route de la Marionnière",
+        "latlng": "47.1326838369943,-1.64003613640521"
+      },
+      {
+        "name": "Place Pierre Semard",
+        "latlng": "47.1898859,-1.5476064"
+      }
+    ]
+  },
+  {
+    "itineraire": "Itinéraire de Place Pierre Semard à Rue Guy Le Lan",
+    "nbPoints": 10,
+    "points": [
+      {
+        "name": "Place Pierre Semard",
+        "latlng": "47.1898948,-1.5475151"
+      },
+      {
+        "name": "Rue Jean Jaurès",
+        "latlng": "47.1858024,-1.5464613"
+      },
+      {
+        "name": "Rue des Déportés",
+        "latlng": "47.1784582,-1.5462601"
+      },
+      {
+        "name": "Rue de la Basse Lande",
+        "latlng": "47.1806879,-1.5406397"
+      },
+      {
+        "name": "Rue Maurice Lagathu",
+        "latlng": "47.180361,-1.5364617"
+      },
+      {
+        "name": "Rue Maurice Lagathu",
+        "latlng": "47.1821386,-1.5381617"
+      },
+      {
+        "name": "Quai Léon Sécher",
+        "latlng": "47.1826624,-1.5315592"
+      },
+      {
+        "name": "Rue Jean Baptiste Vigier",
+        "latlng": "47.1853153,-1.536245"
+      },
+      {
+        "name": "Rue Jean Fraix",
+        "latlng": "47.1860929,-1.5419224"
+      },
+      {
+        "name": "Rue Guy Le Lan",
+        "latlng": "47.1866722,-1.544989"
+      }
+    ]
+  },
+  {
+    "itineraire": "Itinéraire de Place François Mitterrand à Rue Georges Guynemer",
+    "nbPoints": 10,
+    "points": [
+      {
+        "name": "Place François Mitterrand",
+        "latlng": "47.1845289,-1.5594962"
+      },
+      {
+        "name": "Allée de Touraine",
+        "latlng": "47.1860155,-1.5559893"
+      },
+      {
+        "name": "Place du 8 Mai 1945",
+        "latlng": "47.1894121,-1.5520316"
+      },
+      {
+        "name": "Rue Henri Barbusse",
+        "latlng": "47.190887,-1.5632412"
+      },
+      {
+        "name": "Rue du Château de Rezé",
+        "latlng": "47.1844084,-1.5631353"
+      },
+      {
+        "name": "Rue du Château de Rezé",
+        "latlng": "47.1808532,-1.559914"
+      },
+      {
+        "name": "Rue de la Galarnière",
+        "latlng": "47.1777396,-1.5589546"
+      },
+      {
+        "name": "Avenue Léon Blum",
+        "latlng": "47.1831408,-1.5698917"
+      },
+      {
+        "name": "Rue Pasteur",
+        "latlng": "47.1858337,-1.5807503"
+      },
+      {
+        "name": "Rue Georges Guynemer",
+        "latlng": "47.1823057,-1.579809"
+      }
+    ]
+  },
+  {
+    "itineraire": "Itinéraire de Rue Gabriel Goudy à Rue Georges Clémenceau",
+    "nbPoints": 10,
+    "points": [
+      {
+        "name": "Rue Gabriel Goudy",
+        "latlng": "47.1948844,-1.5400776"
+      },
+      {
+        "name": "Rue Gabriel Goudy",
+        "latlng": "47.1960977,-1.5415488"
+      },
+      {
+        "name": "Rue Saint Jacques",
+        "latlng": "47.19649,-1.5388861"
+      },
+      {
+        "name": "Rue des Brêches",
+        "latlng": "47.1954624,-1.5602652"
+      },
+      {
+        "name": "Quai Surcouf",
+        "latlng": "47.1948827,-1.5782721"
+      },
+      {
+        "name": "Rue Ordronneau",
+        "latlng": "47.1913616,-1.5846017"
+      },
+      {
+        "name": "Chemin du Couvent",
+        "latlng": "47.187176,-1.5869618"
+      },
+      {
+        "name": "Rue de la Pierre",
+        "latlng": "47.1841424,-1.5977408"
+      },
+      {
+        "name": "Rue Célestin Freinet",
+        "latlng": "47.1809636,-1.5879163"
+      },
+      {
+        "name": "Rue Georges Clémenceau",
+        "latlng": "47.1751577,-1.5783547"
+      }
+    ]
+  },
+  {
+    "itineraire": "Itinéraire de Rue du Général De Gaulle à Rue des Fromenteaux",
+    "nbPoints": 10,
+    "points": [
+      {
+        "name": "Rue du Général De Gaulle",
+        "latlng": "47.2078826,-1.4965473"
+      },
+      {
+        "name": "Avenue de Glinde",
+        "latlng": "47.2088407,-1.4890707"
+      },
+      {
+        "name": "Rue de Beaugency",
+        "latlng": "47.2039155,-1.4917448"
+      },
+      {
+        "name": "Rue de la Fontaine",
+        "latlng": "47.2017784,-1.4939075"
+      },
+      {
+        "name": "Avenue de Montréal",
+        "latlng": "47.1985431,-1.4873609"
+      },
+      {
+        "name": "Rue de la Jaunaie",
+        "latlng": "47.1920228,-1.4969281"
+      },
+      {
+        "name": "Route de Clisson",
+        "latlng": "47.1890396,-1.5080508"
+      },
+      {
+        "name": "Rue de la Gilarderie",
+        "latlng": "47.1872489,-1.5188114"
+      },
+      {
+        "name": "Allée de la Civelière",
+        "latlng": "47.1884469,-1.5220091"
+      },
+      {
+        "name": "Rue des Fromenteaux",
+        "latlng": "47.1879742,-1.5254782"
+      }
+    ]
+  },
+  {
+    "itineraire": "Itinéraire de Rue Jean Baptiste Robert à Route de Saint Sébastien",
+    "nbPoints": 10,
+    "points": [
+      {
+        "name": "Rue Jean Baptiste Robert",
+        "latlng": "47.2093767,-1.509085"
+      },
+      {
+        "name": "Avenue de la Martellière",
+        "latlng": "47.1995595,-1.5201719"
+      },
+      {
+        "name": "Place Alfred Radigois",
+        "latlng": "47.1934306,-1.5175567"
+      },
+      {
+        "name": "Rue Ambroise Pierre Audouard",
+        "latlng": "47.1884141,-1.5262211"
+      },
+      {
+        "name": "Route de Vertou",
+        "latlng": "47.1864727,-1.5278078"
+      },
+      {
+        "name": "Route de Vertou",
+        "latlng": "47.1900041,-1.532885"
+      },
+      {
+        "name": "Rue de la Ripossière",
+        "latlng": "47.1920259,-1.5343827"
+      },
+      {
+        "name": "Rue Bonne Garde",
+        "latlng": "47.1961227,-1.5279134"
+      },
+      {
+        "name": "Rue de la Libération",
+        "latlng": "47.200346,-1.526677"
+      },
+      {
+        "name": "Route de Saint Sébastien",
+        "latlng": "47.1995689,-1.5312099"
+      }
+    ]
+  },
+  {
+    "itineraire": "Itinéraire de Rue des Hucasseries à Rue de l'Aviation",
+    "nbPoints": 10,
+    "points": [
+      {
+        "name": "Rue des Hucasseries",
+        "latlng": "47.1757596,-1.5345419"
+      },
+      {
+        "name": "Rue de la Vallée",
+        "latlng": "47.1771404,-1.5219812"
+      },
+      {
+        "name": "Rue de la Maillardière",
+        "latlng": "47.1678951,-1.5256069"
+      },
+      {
+        "name": "Rue des Poyaux",
+        "latlng": "47.1638736,-1.5285457"
+      },
+      {
+        "name": "Rue de la Robinière",
+        "latlng": "47.165079,-1.5337164"
+      },
+      {
+        "name": "Rue du Vivier",
+        "latlng": "47.1649692,-1.5422759"
+      },
+      {
+        "name": "Rue de la Gourdonnière",
+        "latlng": "47.1634887,-1.5539489"
+      },
+      {
+        "name": "Rue des Drouards",
+        "latlng": "47.1571054,-1.5681199"
+      },
+      {
+        "name": "Rue de Galheur",
+        "latlng": "47.1638631,-1.5783694"
+      },
+      {
+        "name": "Rue de l'Aviation",
+        "latlng": "47.1611485,-1.5874217"
+      }
+    ]
+  },
+  {
+    "itineraire": "Itinéraire de Rue Charles Lindbergh à Route des Ecobuts",
+    "nbPoints": 9,
+    "points": [
+      {
+        "name": "Rue Charles Lindbergh",
+        "latlng": "47.155055,-1.5983398"
+      },
+      {
+        "name": "Route de la Blanchardais",
+        "latlng": "47.1399681,-1.613892"
+      },
+      {
+        "name": "Route du Champ de Foire",
+        "latlng": "47.124721,-1.6186164"
+      },
+      {
+        "name": "Route de l'Halbrandière",
+        "latlng": "47.120781,-1.6178207"
+      },
+      {
+        "name": "Route de la Gendronnerie",
+        "latlng": "47.1269701,-1.6402779"
+      },
+      {
+        "name": "Rue des Quarterons",
+        "latlng": "47.1289688,-1.6407274"
+      },
+      {
+        "name": "Boulevard Jean Monnet",
+        "latlng": "47.1339751,-1.6461168"
+      },
+      {
+        "name": "Route de la Marionnière",
+        "latlng": "47.1328125,-1.6400734"
+      },
+      {
+        "name": "Route des Ecobuts",
+        "latlng": "47.14381,-1.6311351"
+      }
+    ]
+  },
+  {
+    "itineraire": "Itinéraire de Rue de La Matrasserie à Rue des Roseaux",
+    "nbPoints": 8,
+    "points": [
+      {
+        "name": "Rue de La Matrasserie",
+        "latlng": "47.1729261,-1.6429362"
+      },
+      {
+        "name": "Rue de la Pagerie",
+        "latlng": "47.1795484,-1.6431343"
+      },
+      {
+        "name": "Rue de Beau Soleil",
+        "latlng": "47.1782636,-1.6483174"
+      },
+      {
+        "name": "Rue de la Mouchonnerie",
+        "latlng": "47.1751013,-1.657731"
+      },
+      {
+        "name": "Rue de la Ravardière",
+        "latlng": "47.183588,-1.6621244"
+      },
+      {
+        "name": "Rue de la Haie d'Ancheteau",
+        "latlng": "47.1828344,-1.6709456"
+      },
+      {
+        "name": "Rue de la Haie d'Ancheteau",
+        "latlng": "47.1828344,-1.6709456"
+      },
+      {
+        "name": "Rue des Roseaux",
+        "latlng": "47.187767,-1.6657829"
+      }
+    ]
+  },
+  {
+    "itineraire": "Itinéraire de Avenue du Général De Gaulle à Rue des Sencives",
+    "nbPoints": 8,
+    "points": [
+      {
+        "name": "Avenue du Général De Gaulle",
+        "latlng": "47.1779362,-1.6191525"
+      },
+      {
+        "name": "Rue Eugène Pottier",
+        "latlng": "47.1785394,-1.6284069"
+      },
+      {
+        "name": "Rue des Pêcheurs",
+        "latlng": "47.1866602,-1.6342868"
+      },
+      {
+        "name": "Rue de la Bouguinière",
+        "latlng": "47.1730552,-1.6353918"
+      },
+      {
+        "name": "Rue de la Couillauderie",
+        "latlng": "47.1655622,-1.6343077"
+      },
+      {
+        "name": "Rue Salvador Allende",
+        "latlng": "47.1718449,-1.6239003"
+      },
+      {
+        "name": "Rue de la Gagnerie",
+        "latlng": "47.1699431,-1.6204156"
+      },
+      {
+        "name": "Rue des Sencives",
+        "latlng": "47.1740996,-1.602735"
+      }
+    ]
+  }
+]
