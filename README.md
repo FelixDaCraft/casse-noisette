@@ -15,7 +15,6 @@ itinéraire complet prêt à naviguer.
 
 - **Ouverture en 1 clic** dans Google Maps (itinéraire complet multi-arrêts).
 - **OpenStreetMap** : itinéraire complet aussi (moteur OSRM piéton / vélo / voiture).
-- **Waze** : navigation vers le 1er panneau (Waze ne gère pas les arrêts multiples).
 - **Partage Telegram** par itinéraire.
 - Sélecteur de mode (à pied / vélo / voiture) + option « depuis ma position ».
 - Design glassmorphism, couleurs LFI, typographies Fraunces + Inter, animations discrètes.
