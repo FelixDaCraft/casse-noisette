@@ -11,30 +11,57 @@ Google Maps limite une carte à 10 calques / 10 points par itinéraire, affiche 
 itinéraires en même temps, et oblige à ajouter chaque point à la main. Ici, un clic = un
 itinéraire complet prêt à naviguer.
 
-## Contenu
+## Comment ça marche
+
+Tout tourne **sur le homelab**, aucune intervention depuis un PC :
+
+1. La carte de référence est une Google My Map (les itinéraires + panneaux y sont édités).
+2. Un script Python (`generate.py`) télécharge l'export KML, extrait les itinéraires et
+   leurs panneaux, et injecte les données dans `template.html` → `site/index.html`.
+3. Un **cron** relance `generate.py` toutes les 15 min : la carte est modifiée → le site
+   se met à jour tout seul.
+4. nginx sert `site/` en direct ; Cloudflare Tunnel l'expose sur `casse-noisette.aynn.fr`.
+
+```
+Google My Map ──(KML)──> generate.py ──> site/index.html ──> nginx ──> Cloudflare ──> casse-noisette.aynn.fr
+                            ▲
+                         cron (*/15)
+```
+
+## Fichiers
 
 | Fichier | Rôle |
 |---|---|
-| `index.html` | Le site (page statique autonome, données embarquées en JS) |
-| `refresh.ps1` | Régénère le site depuis la My Map et le redéploie |
-| `data.json` | Données extraites du KML (itinéraires + panneaux) |
-| `source.kml` | Export brut de la Google My Map |
+| `generate.py` | Télécharge le KML, génère `site/index.html` (stdlib Python, zéro dépendance) |
+| `template.html` | Gabarit du site ; `__DATA__` est remplacé par les données au build |
+| `README.md` | Ce fichier |
 
-## Mettre à jour
+Fichiers **générés** (non versionnés, voir `.gitignore`) : `site/`, `data.json`, `source.kml`.
 
-Après modification de la My Map (ajout/retrait de panneaux) :
+## Mettre à jour le contenu
 
-```powershell
-pwsh ./refresh.ps1
+Rien à faire : édite la Google My Map, le cron régénère dans les 15 min.
+Pour forcer tout de suite :
+
+```bash
+ssh root@192.168.1.122 "cd /opt/casse-noisette && python3 generate.py"
 ```
 
-Le script re-télécharge le KML, régénère `index.html` et le redéploie sur le homelab.
+## Modifier le code (template / générateur)
 
-## Déploiement
+Édite `template.html` ou `generate.py`, puis redéploie sur le homelab :
 
-- Conteneur `casse-noisette` (nginx:alpine) sur `127.0.0.1:3023` (homelab).
-- Exposé via Cloudflare Tunnel : `casse-noisette.aynn.fr`.
-- Fichiers servis depuis `/opt/casse-noisette/site/`.
+```bash
+scp generate.py template.html root@192.168.1.122:/opt/casse-noisette/
+ssh root@192.168.1.122 "cd /opt/casse-noisette && python3 generate.py"
+```
+
+## Déploiement (rappel infra)
+
+- Conteneur `casse-noisette` (nginx:alpine) sur `127.0.0.1:3023` (homelab `192.168.1.122`).
+- Fichiers dans `/opt/casse-noisette/` ; web root `/opt/casse-noisette/site/`.
+- Exposé via Cloudflare Tunnel (`aa7c83ec-…`) : ingress `casse-noisette.aynn.fr → localhost:3023`.
+- Cron : `*/15 * * * *` → `generate.py` (log : `/var/log/casse-noisette.log`).
 
 ## Notes techniques
 
