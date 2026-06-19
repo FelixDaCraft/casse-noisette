@@ -11,6 +11,15 @@ Google Maps limite une carte à 10 calques / 10 points par itinéraire, affiche 
 itinéraires en même temps, et oblige à ajouter chaque point à la main. Ici, un clic = un
 itinéraire complet prêt à naviguer.
 
+## Fonctionnalités
+
+- **Ouverture en 1 clic** dans Google Maps (itinéraire complet multi-arrêts).
+- **OpenStreetMap** : itinéraire complet aussi (moteur OSRM piéton / vélo / voiture).
+- **Waze** : navigation vers le 1er panneau (Waze ne gère pas les arrêts multiples).
+- **Partage Telegram** par itinéraire.
+- Sélecteur de mode (à pied / vélo / voiture) + option « depuis ma position ».
+- Design glassmorphism, couleurs LFI, typographies Fraunces + Inter, animations discrètes.
+
 ## Comment ça marche
 
 Tout tourne **sur le homelab**, aucune intervention depuis un PC :
