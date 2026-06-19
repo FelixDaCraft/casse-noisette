@@ -1,4 +1,19 @@
-# Artefacts générés par generate.py
-site/
-data.json
-source.kml
+# dépendances
+/node_modules
+/.pnp
+.pnp.js
+
+# build Next
+/.next/
+/out/
+next-env.d.ts
+tsconfig.tsbuildinfo
+
+# environnement / secrets
+.env
+.env*.local
+.env.production
+
+# divers
+.DS_Store
+*.log

@@ -1,0 +1,46 @@
+// Casse-Noisette — schéma Prisma (PostgreSQL)
+// Itinéraires de collage + panneaux + comptes admin.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Compte administrateur (gestion via le backoffice).
+model Admin {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+}
+
+/// Un itinéraire de collage (ordonné via `position`).
+model Itinerary {
+  id        String   @id @default(cuid())
+  name      String
+  position  Int      @default(0)
+  panels    Panel[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([position])
+}
+
+/// Un panneau d'affichage, rattaché à un itinéraire (ordonné via `position`).
+model Panel {
+  id          String    @id @default(cuid())
+  name        String
+  lat         Float
+  lng         Float
+  position    Int       @default(0)
+  itinerary   Itinerary @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+  itineraryId String
+  createdAt   DateTime  @default(now())
+
+  @@index([itineraryId, position])
+}

@@ -1,0 +1,92 @@
+name: Deploy to homelab
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-casse-noisette
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Typecheck, build & deploy
+    runs-on: [self-hosted, linux, homelab]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Sync docker-compose.yml
+        run: |
+          set -e
+          DEST=/opt/casse-noisette-app
+          mkdir -p "$DEST"
+          cp docker-compose.yml "$DEST/docker-compose.yml"
+          if [ ! -f "$DEST/.env" ]; then
+            echo "::error::$DEST/.env manquant. Le créer une fois (voir .env.example)."
+            exit 1
+          fi
+
+      - name: Build Docker image
+        run: docker build -t casse-noisette:latest -f Dockerfile .
+
+      - name: Start database
+        working-directory: /opt/casse-noisette-app
+        run: |
+          set -e
+          docker compose up -d db
+          for i in $(seq 1 30); do
+            if docker exec casse-noisette-db pg_isready -U "$(grep '^POSTGRES_USER=' .env | cut -d= -f2- | tr -d '\"')" >/dev/null 2>&1; then
+              echo "db ready"; break
+            fi
+            sleep 2
+          done
+
+      - name: Migrate & seed
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -e
+          export POSTGRES_USER=$(grep '^POSTGRES_USER=' /opt/casse-noisette-app/.env | cut -d= -f2- | tr -d '"')
+          export POSTGRES_PASSWORD=$(grep '^POSTGRES_PASSWORD=' /opt/casse-noisette-app/.env | cut -d= -f2- | tr -d '"')
+          echo "::add-mask::$POSTGRES_PASSWORD"
+          export POSTGRES_DB=$(grep '^POSTGRES_DB=' /opt/casse-noisette-app/.env | cut -d= -f2- | tr -d '"')
+          export DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:5434/${POSTGRES_DB}?schema=public"
+          echo "::add-mask::$DATABASE_URL"
+          export SEED_ADMIN_EMAIL=$(grep '^SEED_ADMIN_EMAIL=' /opt/casse-noisette-app/.env | cut -d= -f2- | tr -d '"')
+          export SEED_ADMIN_PASSWORD=$(grep '^SEED_ADMIN_PASSWORD=' /opt/casse-noisette-app/.env | cut -d= -f2- | tr -d '"')
+          echo "::add-mask::$SEED_ADMIN_PASSWORD"
+          npx prisma db push --skip-generate
+          node prisma/seed.mjs
+
+      - name: Deploy app
+        working-directory: /opt/casse-noisette-app
+        run: |
+          set -e
+          docker compose up -d web
+          sleep 5
+          for i in $(seq 1 40); do
+            STATUS=$(docker inspect --format '{{.State.Health.Status}}' casse-noisette-web 2>/dev/null || echo "missing")
+            if [ "$STATUS" = "healthy" ]; then echo "app healthy"; exit 0; fi
+            echo "health=$STATUS ($i/40)"; sleep 3
+          done
+          echo "::error::app failed to become healthy"; docker logs casse-noisette-web --tail 100; exit 1
+
+      - name: Cleanup old images
+        if: success()
+        run: docker image prune -f

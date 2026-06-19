@@ -1,81 +1,54 @@
 # Casse-Noisette — itinéraires de collage (4ème circo 44)
 
-Mini-site qui transforme une **Google My Map** d'itinéraires de collage en **liens cliquables**
-ouvrant directement Google Maps en mode navigation, avec tous les panneaux déjà chargés.
+Application web pour gérer et consulter des **itinéraires de collage** : page publique
+(liens de navigation Google Maps / OpenStreetMap / partage Telegram) + **backoffice**
+complet (édition des itinéraires et panneaux sur carte, gestion des comptes admin).
 
-🔗 **En ligne :** https://casse-noisette.aynn.fr
+🔗 **En ligne :** https://casse-noisette.aynn.fr · **Admin :** `/admin`
 
-## Le problème résolu
+## Stack
 
-Google Maps limite une carte à 10 calques / 10 points par itinéraire, affiche tous les
-itinéraires en même temps, et oblige à ajouter chaque point à la main. Ici, un clic = un
-itinéraire complet prêt à naviguer.
+Next.js 15 (App Router, TS) · PostgreSQL + Prisma · Leaflet/OpenStreetMap (éditeur carte) ·
+auth maison (sessions signées HMAC, mots de passe scrypt). PWA (installable + hors-ligne).
 
 ## Fonctionnalités
 
-- **Ouverture en 1 clic** dans Google Maps (itinéraire complet multi-arrêts).
-- **OpenStreetMap** : itinéraire complet aussi (moteur OSRM piéton / vélo / voiture).
-- **Partage Telegram** par itinéraire.
-- Sélecteur de mode (à pied / vélo / voiture) + option « depuis ma position ».
-- Design glassmorphism, couleurs LFI, typographies Fraunces + Inter, animations discrètes.
-- **PWA installable** (icône Marx casse-noisette) avec **support hors-ligne** via service worker.
+**Public** (`/`)
+- Itinéraires alimentés par la base de données.
+- Bouton **Google Maps** : itinéraire multi-arrêts + lancement direct de la navigation GPS (`dir_action=navigate`).
+- **OpenStreetMap** (multi-arrêts) + **partage Telegram** par itinéraire.
+- Modes à pied / vélo / voiture, option « depuis ma position ».
+- Design glassmorphism couleurs LFI (Fraunces + Inter), PWA installable + hors-ligne.
 
-## Comment ça marche
+**Admin** (`/admin`)
+- Connexion email + mot de passe (comptes en base, sessions signées).
+- Itinéraires : créer / renommer / réordonner / supprimer.
+- Panneaux : **carte Leaflet** — clic pour ajouter, glisser pour déplacer ; renommer / réordonner / supprimer.
+- Gestion des comptes admin : créer / désactiver / supprimer.
 
-Tout tourne **sur le homelab**, aucune intervention depuis un PC :
+## Modèle de données (`prisma/schema.prisma`)
 
-1. La carte de référence est une Google My Map (les itinéraires + panneaux y sont édités).
-2. Un script Python (`generate.py`) télécharge l'export KML, extrait les itinéraires et
-   leurs panneaux, et injecte les données dans `template.html` → `site/index.html`.
-3. Un **cron** relance `generate.py` toutes les 15 min : la carte est modifiée → le site
-   se met à jour tout seul.
-4. nginx sert `site/` en direct ; Cloudflare Tunnel l'expose sur `casse-noisette.aynn.fr`.
+- `Admin` (email, passwordHash scrypt, active)
+- `Itinerary` (name, position) → `Panel[]`
+- `Panel` (name, lat, lng, position, itineraryId)
 
-```
-Google My Map ──(KML)──> generate.py ──> site/index.html ──> nginx ──> Cloudflare ──> casse-noisette.aynn.fr
-                            ▲
-                         cron (*/15)
-```
-
-## Fichiers
-
-| Fichier | Rôle |
-|---|---|
-| `generate.py` | Télécharge le KML, génère `site/index.html` puis copie `static/` → `site/` |
-| `template.html` | Gabarit du site ; `__DATA__` est remplacé par les données au build |
-| `static/` | Assets PWA : icônes, `favicon.ico`, `manifest.webmanifest`, `sw.js` |
-| `nginx.conf` | Conf nginx (type MIME du manifest, no-cache du service worker) |
-| `README.md` | Ce fichier |
-
-Fichiers **générés** (non versionnés, voir `.gitignore`) : `site/`, `data.json`, `source.kml`.
-
-## Mettre à jour le contenu
-
-Rien à faire : édite la Google My Map, le cron régénère dans les 15 min.
-Pour forcer tout de suite :
+## Développement local
 
 ```bash
-ssh root@192.168.1.122 "cd /opt/casse-noisette && python3 generate.py"
+cp .env.example .env          # renseigner DATABASE_URL + SESSION_SECRET + SEED_ADMIN_*
+npm install
+npm run db:push               # crée les tables
+npm run db:seed               # admin initial + import des itinéraires (prisma/seed-data.json)
+npm run dev                   # http://localhost:3000
 ```
 
-## Modifier le code (template / générateur)
+## Déploiement (homelab)
 
-Édite `template.html` ou `generate.py`, puis redéploie sur le homelab :
+- Conteneurs `casse-noisette-web` (port `127.0.0.1:3024`) + `casse-noisette-db` (Postgres 16, `127.0.0.1:5434`).
+- Exposé via le Cloudflare Tunnel : `casse-noisette.aynn.fr` → `http://localhost:3024`.
+- Secrets dans `/opt/casse-noisette-app/.env` (hors Git, voir `.env.example`).
+- **Auto-deploy par `git push` sur `main`** (`.github/workflows/deploy.yml`, runner self-hosted homelab) :
+  `npm ci` → `tsc --noEmit` → build image → `db push` + seed (depuis le runner) → `docker compose up`.
 
-```bash
-scp generate.py template.html root@192.168.1.122:/opt/casse-noisette/
-ssh root@192.168.1.122 "cd /opt/casse-noisette && python3 generate.py"
-```
-
-## Déploiement (rappel infra)
-
-- Conteneur `casse-noisette` (nginx:alpine) sur `127.0.0.1:3023` (homelab `192.168.1.122`).
-- Fichiers dans `/opt/casse-noisette/` ; web root `/opt/casse-noisette/site/`.
-- Exposé via Cloudflare Tunnel (`aa7c83ec-…`) : ingress `casse-noisette.aynn.fr → localhost:3023`.
-- Cron : `*/15 * * * *` → `generate.py` (log : `/var/log/casse-noisette.log`).
-
-## Notes techniques
-
-- Google Maps plafonne à **10 arrêts par trajet** (position de départ comprise).
-- Format des liens : `https://www.google.com/maps/dir/?api=1&travelmode=...&origin=...&destination=...&waypoints=a|b|c`
-- Coordonnées en `latitude,longitude` (le KML stocke `lng,lat` → inversion à l'extraction).
+> Les migrations/seed sont lancés **depuis le runner CI**, pas dans le conteneur
+> (l'image standalone ne trace que le client Prisma, pas le CLI complet).
