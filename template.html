@@ -189,6 +189,7 @@ function gmaps(points,mode,fromHere){
   if(origin)u+="&origin="+enc(origin);
   u+="&destination="+enc(dest);
   if(wp.length)u+="&waypoints="+wp.map(enc).join("%7C");
+  u+="&dir_action=navigate"; // lance directement la navigation GPS
   return u;
 }
 function osm(points,mode){
