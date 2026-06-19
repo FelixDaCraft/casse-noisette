@@ -39,6 +39,13 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-casse}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requis}@db:5432/${POSTGRES_DB:-casse_noisette}?schema=public
       SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET requis (openssl rand -hex 32)}
       NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://casse-noisette.aynn.fr}
+      # SMTP (reset de mot de passe par email) — optionnel ; vide = pas d'envoi.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-}
       NODE_ENV: production
     ports:
       - '127.0.0.1:3024:3000'

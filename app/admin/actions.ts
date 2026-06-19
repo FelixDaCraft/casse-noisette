@@ -5,6 +5,8 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { requireAdmin, makeToken, ADMIN_COOKIE, SESSION_TTL_SECONDS } from '@/lib/auth';
 import { hashPassword, verifyPassword } from '@/lib/password';
+import { sendMail } from '@/lib/mail';
+import { makeResetToken, hashResetToken } from '@/lib/reset';
 
 function revalAll(itineraryId?: string) {
   revalidatePath('/');
@@ -37,6 +39,60 @@ export async function logout() {
   const store = await cookies();
   store.delete(ADMIN_COOKIE);
   redirect('/admin/login');
+}
+
+/* ---------------- Reset de mot de passe par email ---------------- */
+
+export async function requestReset(
+  _prev: { error?: string; ok?: string } | undefined,
+  formData: FormData,
+): Promise<{ error?: string; ok?: string }> {
+  const email = String(formData.get('email') || '').toLowerCase().trim();
+  if (!email) return { error: 'Email requis.' };
+  // Réponse générique : ne révèle pas si le compte existe.
+  const generic = {
+    ok: 'Si un compte existe pour cet email, un lien de réinitialisation vient d’être envoyé.',
+  };
+  const admin = await prisma.admin.findUnique({ where: { email } });
+  if (admin && admin.active) {
+    await prisma.passwordReset.deleteMany({ where: { adminId: admin.id, usedAt: null } });
+    const { raw, hash } = makeResetToken();
+    await prisma.passwordReset.create({
+      data: { adminId: admin.id, tokenHash: hash, expiresAt: new Date(Date.now() + 60 * 60 * 1000) },
+    });
+    const base = process.env.NEXT_PUBLIC_SITE_URL || '';
+    const link = `${base}/admin/reset?token=${raw}`;
+    await sendMail(
+      admin.email,
+      'Réinitialisation de ton mot de passe — Casse-Noisette',
+      `<p>Une réinitialisation de mot de passe a été demandée pour le backoffice Casse-Noisette.</p>
+       <p><a href="${link}">Clique ici pour choisir un nouveau mot de passe</a> (lien valable 1 heure).</p>
+       <p>Si tu n’es pas à l’origine de cette demande, ignore cet email.</p>`,
+      `Réinitialise ton mot de passe (lien valable 1h) : ${link}`,
+    );
+  }
+  return generic;
+}
+
+export async function performReset(
+  _prev: { error?: string } | undefined,
+  formData: FormData,
+) {
+  const token = String(formData.get('token') || '');
+  const password = String(formData.get('password') || '');
+  const confirm = String(formData.get('confirm') || '');
+  if (password.length < 8) return { error: 'Mot de passe : 8 caractères minimum.' };
+  if (password !== confirm) return { error: 'Les mots de passe ne correspondent pas.' };
+
+  const reset = await prisma.passwordReset.findUnique({ where: { tokenHash: hashResetToken(token) } });
+  if (!reset || reset.usedAt || reset.expiresAt < new Date()) {
+    return { error: 'Lien invalide ou expiré. Refais une demande.' };
+  }
+  await prisma.$transaction([
+    prisma.admin.update({ where: { id: reset.adminId }, data: { passwordHash: hashPassword(password) } }),
+    prisma.passwordReset.update({ where: { id: reset.id }, data: { usedAt: new Date() } }),
+  ]);
+  redirect('/admin/login?reset=1');
 }
 
 /* ---------------- Itinéraires ---------------- */

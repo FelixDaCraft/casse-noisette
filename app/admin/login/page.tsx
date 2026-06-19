@@ -4,11 +4,16 @@ import LoginForm from './LoginForm';
 
 export const dynamic = 'force-dynamic';
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ reset?: string }>;
+}) {
   if (await getCurrentAdmin()) redirect('/admin');
+  const { reset } = await searchParams;
   return (
     <div className="login-wrap">
-      <LoginForm />
+      <LoginForm resetDone={reset === '1'} />
     </div>
   );
 }

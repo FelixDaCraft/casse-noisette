@@ -12,11 +12,25 @@ datasource db {
 
 /// Compte administrateur (gestion via le backoffice).
 model Admin {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String          @id @default(cuid())
+  email        String          @unique
   passwordHash String
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now())
+  active       Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+  resets       PasswordReset[]
+}
+
+/// Jeton de réinitialisation de mot de passe (envoyé par email, à usage unique).
+model PasswordReset {
+  id        String    @id @default(cuid())
+  admin     Admin     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  adminId   String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([adminId])
 }
 
 /// Un itinéraire de collage (ordonné via `position`).
