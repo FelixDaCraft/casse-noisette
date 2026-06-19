@@ -18,6 +18,7 @@ itinéraire complet prêt à naviguer.
 - **Partage Telegram** par itinéraire.
 - Sélecteur de mode (à pied / vélo / voiture) + option « depuis ma position ».
 - Design glassmorphism, couleurs LFI, typographies Fraunces + Inter, animations discrètes.
+- **PWA installable** (icône Marx casse-noisette) avec **support hors-ligne** via service worker.
 
 ## Comment ça marche
 
@@ -40,8 +41,10 @@ Google My Map ──(KML)──> generate.py ──> site/index.html ──> ngi
 
 | Fichier | Rôle |
 |---|---|
-| `generate.py` | Télécharge le KML, génère `site/index.html` (stdlib Python, zéro dépendance) |
+| `generate.py` | Télécharge le KML, génère `site/index.html` puis copie `static/` → `site/` |
 | `template.html` | Gabarit du site ; `__DATA__` est remplacé par les données au build |
+| `static/` | Assets PWA : icônes, `favicon.ico`, `manifest.webmanifest`, `sw.js` |
+| `nginx.conf` | Conf nginx (type MIME du manifest, no-cache du service worker) |
 | `README.md` | Ce fichier |
 
 Fichiers **générés** (non versionnés, voir `.gitignore`) : `site/`, `data.json`, `source.kml`.

@@ -12,6 +12,7 @@ Lancé périodiquement par cron pour rester synchro avec la carte.
 """
 import json
 import os
+import shutil
 import sys
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -82,8 +83,18 @@ def main():
     with open(os.path.join(site_dir, "index.html"), "w", encoding="utf-8") as f:
         f.write(html)
 
+    # Copie des assets statiques (icônes, manifest, service worker) dans site/
+    static_dir = os.path.join(BASE, "static")
+    copied = 0
+    if os.path.isdir(static_dir):
+        for fn in os.listdir(static_dir):
+            src = os.path.join(static_dir, fn)
+            if os.path.isfile(src):
+                shutil.copy2(src, os.path.join(site_dir, fn))
+                copied += 1
+
     total = sum(len(i["points"]) for i in itins)
-    print(f"OK : {len(itins)} itinéraires, {total} panneaux -> site/index.html")
+    print(f"OK : {len(itins)} itinéraires, {total} panneaux, {copied} assets -> site/")
 
 
 if __name__ == "__main__":

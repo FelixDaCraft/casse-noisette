@@ -1,0 +1,18 @@
+{
+  "id": "/",
+  "name": "Collage — 4ème circo 44",
+  "short_name": "Collage 44",
+  "description": "Itinéraires de collage — 4ème circonscription de Loire-Atlantique",
+  "lang": "fr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0a0608",
+  "theme_color": "#0a0608",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
