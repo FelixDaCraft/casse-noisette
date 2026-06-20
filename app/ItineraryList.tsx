@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { gmapsUrl, osmUrl, telegramUrl, cleanName, type Mode } from '@/lib/maps';
 
 type Panel = { name: string; lat: number; lng: number };
-type It = { id: string; name: string; panels: Panel[] };
+type It = { id: string; name: string; city: string | null; panels: Panel[] };
 
 const IconNav = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -30,8 +30,18 @@ const IconChev = (
 
 export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
   const [mode, setMode] = useState<Mode>('driving');
-  const [fromHere, setFromHere] = useState(false);
   const total = itineraries.reduce((s, it) => s + it.panels.length, 0);
+
+  // Regroupement par ville (la liste arrive déjà triée : ville puis position).
+  const groups: { city: string; items: It[] }[] = [];
+  for (const it of itineraries) {
+    const c = it.city && it.city.trim() ? it.city.trim() : 'Autres';
+    const last = groups[groups.length - 1];
+    if (last && last.city === c) last.items.push(it);
+    else groups.push({ city: c, items: [it] });
+  }
+
+  let order = 0; // index global pour échelonner l'animation d'entrée
 
   return (
     <>
@@ -46,8 +56,8 @@ export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
             Itinéraires de <em>collage</em>
           </h1>
           <p className="sub">
-            {itineraries.length} itinéraires · {total} panneaux. Choisis ton mode, puis ouvre un
-            itinéraire : la navigation GPS se lance avec tous les panneaux.
+            {itineraries.length} itinéraires · {total} panneaux · {groups.length} ville
+            {groups.length > 1 ? 's' : ''}. La navigation démarre depuis ta position GPS.
           </p>
         </header>
 
@@ -63,54 +73,57 @@ export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
               </button>
             ))}
           </div>
-          <label className="toggle">
-            <input type="checkbox" checked={fromHere} onChange={(e) => setFromHere(e.target.checked)} />
-            Depuis ma position
-          </label>
         </div>
 
         {itineraries.length === 0 && <p className="muted">Aucun itinéraire pour le moment.</p>}
 
-        {itineraries.map((it, idx) => {
-          const g = gmapsUrl(it.panels, mode, fromHere);
-          const stops = it.panels.length + (fromHere ? 1 : 0);
-          return (
-            <article className="card" key={it.id} style={{ animationDelay: `${idx * 70}ms` }}>
-              <h2>
-                <span className="num">{idx + 1}</span> {cleanName(it.name)}
-              </h2>
-              <div className="meta">
-                <span className="badge">{it.panels.length} panneaux</span>
-                {stops > 10 && <span className="badge warn">⚠ {stops} arrêts &gt; 10</span>}
-              </div>
-              <a className="cta" href={g} target="_blank" rel="noopener">
-                {IconNav} Ouvrir dans Google Maps
-              </a>
-              <div className="alts">
-                <a className="alt osm" href={osmUrl(it.panels, mode)} target="_blank" rel="noopener">
-                  {IconOsm} OpenStreetMap
-                </a>
-                <a className="alt tg" href={telegramUrl(cleanName(it.name), g)} target="_blank" rel="noopener">
-                  {IconTg} Partager
-                </a>
-              </div>
-              <details>
-                <summary>
-                  {IconChev} Voir les {it.panels.length} panneaux
-                </summary>
-                <ol>
-                  {it.panels.map((p, i) => (
-                    <li key={i}>{p.name || 'Panneau ' + (i + 1)}</li>
-                  ))}
-                </ol>
-              </details>
-            </article>
-          );
-        })}
+        {groups.map((g) => (
+          <section key={g.city}>
+            <h2 className="city-head">
+              <span className="pin">📍</span> {g.city} <span className="cnt">{g.items.length} itin.</span>
+            </h2>
+            {g.items.map((it, gi) => {
+              const gUrl = gmapsUrl(it.panels, mode);
+              const stops = it.panels.length + 1; // + position GPS de départ
+              return (
+                <article className="card" key={it.id} style={{ animationDelay: `${order++ * 60}ms` }}>
+                  <h3>
+                    <span className="num">{gi + 1}</span> {cleanName(it.name)}
+                  </h3>
+                  <div className="meta">
+                    <span className="badge">{it.panels.length} panneaux</span>
+                    {stops > 10 && <span className="badge warn">⚠ {stops} arrêts avec ta position</span>}
+                  </div>
+                  <a className="cta" href={gUrl} target="_blank" rel="noopener">
+                    {IconNav} Ouvrir dans Google Maps
+                  </a>
+                  <div className="alts">
+                    <a className="alt osm" href={osmUrl(it.panels, mode)} target="_blank" rel="noopener">
+                      {IconOsm} OpenStreetMap
+                    </a>
+                    <a className="alt tg" href={telegramUrl(cleanName(it.name), gUrl)} target="_blank" rel="noopener">
+                      {IconTg} Partager
+                    </a>
+                  </div>
+                  <details>
+                    <summary>
+                      {IconChev} Voir les {it.panels.length} panneaux
+                    </summary>
+                    <ol>
+                      {it.panels.map((p, i) => (
+                        <li key={i}>{p.name || 'Panneau ' + (i + 1)}</li>
+                      ))}
+                    </ol>
+                  </details>
+                </article>
+              );
+            })}
+          </section>
+        ))}
 
         <p className="foot">
-          Google Maps &amp; OpenStreetMap chargent l&apos;itinéraire complet. Limite Google Maps :
-          10 arrêts max (ta position comprise).
+          La navigation démarre depuis ta position GPS vers chaque panneau, dans l&apos;ordre. Google
+          Maps limite à ~10 arrêts (ta position comprise).
         </p>
       </div>
     </>

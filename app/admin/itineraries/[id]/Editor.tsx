@@ -8,7 +8,7 @@ import {
   updatePanel,
   deletePanel,
   movePanel,
-  renameItinerary,
+  updateItinerary,
   deleteItinerary,
 } from '../../actions';
 import { MAX_PANELS } from '@/lib/maps';
@@ -20,10 +20,11 @@ const round = (n: number) => Math.round(n * 1e6) / 1e6;
 export default function Editor({
   itinerary,
 }: {
-  itinerary: { id: string; name: string; panels: P[] };
+  itinerary: { id: string; name: string; city: string | null; panels: P[] };
 }) {
   const router = useRouter();
   const [name, setName] = useState(itinerary.name);
+  const [city, setCity] = useState(itinerary.city ?? '');
   const [panels, setPanels] = useState<P[]>(itinerary.panels);
   const [notice, setNotice] = useState('');
   const [, start] = useTransition();
@@ -149,32 +150,44 @@ export default function Editor({
         </Link>
       </p>
 
-      <div className="panel row">
-        <input
-          className="grow"
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          aria-label="Nom de l'itinéraire"
-        />
-        <button
-          className="btn primary"
-          onClick={() => start(async () => { await renameItinerary(itinerary.id, name); })}
-        >
-          Renommer
-        </button>
-        <button
-          className="btn danger"
-          onClick={() => {
-            if (confirm('Supprimer cet itinéraire et tous ses panneaux ?'))
-              start(async () => {
-                await deleteItinerary(itinerary.id);
-                router.push('/admin');
-              });
-          }}
-        >
-          Supprimer
-        </button>
+      <div className="panel">
+        <div className="row">
+          <input
+            className="grow"
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            aria-label="Nom de l'itinéraire"
+          />
+          <input
+            type="text"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            placeholder="Ville"
+            aria-label="Ville"
+            style={{ maxWidth: 180 }}
+          />
+        </div>
+        <div className="row" style={{ marginTop: 10 }}>
+          <button
+            className="btn primary"
+            onClick={() => start(async () => { await updateItinerary(itinerary.id, name, city); })}
+          >
+            Enregistrer
+          </button>
+          <button
+            className="btn danger"
+            onClick={() => {
+              if (confirm('Supprimer cet itinéraire et tous ses panneaux ?'))
+                start(async () => {
+                  await deleteItinerary(itinerary.id);
+                  router.push('/admin');
+                });
+            }}
+          >
+            Supprimer
+          </button>
+        </div>
       </div>
 
       <div className="row" style={{ margin: '4px 0' }}>

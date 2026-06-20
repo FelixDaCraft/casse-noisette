@@ -10,24 +10,17 @@ export function latlng(p: Coord): string {
   return `${p.lat},${p.lng}`;
 }
 
-/** Lien Google Maps : itinéraire multi-arrêts + lancement direct de la navigation. */
-export function gmapsUrl(panels: Coord[], mode: Mode, fromHere: boolean): string {
+/**
+ * Lien Google Maps : itinéraire multi-arrêts + lancement direct de la navigation.
+ * Part TOUJOURS de la position GPS de l'utilisateur (pas d'`origin` -> position actuelle).
+ */
+export function gmapsUrl(panels: Coord[], mode: Mode): string {
   if (panels.length === 0) return '#';
   const enc = (s: string) => encodeURIComponent(s);
   const c = panels.map(latlng);
-  let origin: string | undefined;
-  let dest: string;
-  let wp: string[];
-  if (fromHere) {
-    dest = c[c.length - 1];
-    wp = c.slice(0, -1);
-  } else {
-    origin = c[0];
-    dest = c[c.length - 1];
-    wp = c.slice(1, -1);
-  }
+  const dest = c[c.length - 1];
+  const wp = c.slice(0, -1); // tous les panneaux sauf le dernier = arrêts intermédiaires
   let u = `https://www.google.com/maps/dir/?api=1&travelmode=${mode}`;
-  if (origin) u += `&origin=${enc(origin)}`;
   u += `&destination=${enc(dest)}`;
   if (wp.length) u += `&waypoints=${wp.map(enc).join('%7C')}`;
   u += '&dir_action=navigate';

@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useTransition } from 'react';
 import { moveItinerary, deleteItinerary } from './actions';
 
-type Item = { id: string; name: string; count: number };
+type Item = { id: string; name: string; city: string | null; count: number };
 
 export default function ItineraryAdminList({ items }: { items: Item[] }) {
   const [pending, start] = useTransition();
@@ -15,6 +15,11 @@ export default function ItineraryAdminList({ items }: { items: Item[] }) {
           <span className="title grow">
             <Link href={`/admin/itineraries/${it.id}`}>{it.name}</Link>
           </span>
+          {it.city ? (
+            <span className="badge">📍 {it.city}</span>
+          ) : (
+            <span className="badge warn">sans ville</span>
+          )}
           <span className="count">{it.count} panneaux</span>
           <button
             className="btn sm"

@@ -106,16 +106,17 @@ export async function createItinerary(formData: FormData) {
   await requireAdmin();
   const name = String(formData.get('name') || '').trim();
   if (!name) return;
+  const city = String(formData.get('city') || '').trim() || null;
   const max = await prisma.itinerary.aggregate({ _max: { position: true } });
-  await prisma.itinerary.create({ data: { name, position: (max._max.position ?? -1) + 1 } });
+  await prisma.itinerary.create({ data: { name, city, position: (max._max.position ?? -1) + 1 } });
   revalAll();
 }
 
-export async function renameItinerary(id: string, name: string) {
+export async function updateItinerary(id: string, name: string, city: string) {
   await requireAdmin();
   const n = name.trim();
   if (!n) return;
-  await prisma.itinerary.update({ where: { id }, data: { name: n } });
+  await prisma.itinerary.update({ where: { id }, data: { name: n, city: city.trim() || null } });
   revalAll(id);
 }
 

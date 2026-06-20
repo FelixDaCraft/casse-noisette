@@ -18,6 +18,7 @@ export default async function EditItinerary({ params }: { params: Promise<{ id: 
       itinerary={{
         id: it.id,
         name: it.name,
+        city: it.city,
         panels: it.panels.map((p) => ({ id: p.id, name: p.name, lat: p.lat, lng: p.lng })),
       }}
     />

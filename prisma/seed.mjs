@@ -38,6 +38,7 @@ async function main() {
       await prisma.itinerary.create({
         data: {
           name: it.name,
+          city: it.city ?? null,
           position: pos++,
           panels: {
             create: it.panels.map((p, i) => ({ name: p.name, lat: p.lat, lng: p.lng, position: i })),

@@ -62,8 +62,13 @@ h1 em{font-style:italic; color:var(--lfi-2)}
 .card::before{content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:linear-gradient(var(--lfi),var(--lfi-deep))}
 .card:hover{transform:translateY(-3px); border-color:rgba(229,18,59,.45); box-shadow:0 16px 50px rgba(229,18,59,.18)}
 @keyframes rise{to{opacity:1; transform:none}}
-.card h2{display:flex; align-items:center; gap:12px; margin:0; font-family:var(--font-fraunces),serif;
+.card h3{display:flex; align-items:center; gap:12px; margin:0; font-family:var(--font-fraunces),serif;
   font-weight:600; font-size:1.18rem; letter-spacing:-.01em; line-height:1.2}
+.city-head{display:flex; align-items:center; gap:10px; margin:30px 2px 14px;
+  font-family:var(--font-fraunces),serif; font-weight:600; font-size:1.3rem; letter-spacing:-.01em}
+.city-head .pin{font-size:1rem}
+.city-head .cnt{font:600 .68rem var(--font-inter); color:var(--muted); text-transform:uppercase; letter-spacing:.12em; white-space:nowrap}
+.city-head::after{content:""; flex:1; height:1px; background:linear-gradient(90deg, var(--stroke), transparent)}
 .num{flex:0 0 auto; width:30px; height:30px; border-radius:10px; display:grid; place-items:center;
   font:700 .85rem var(--font-inter); background:linear-gradient(135deg,var(--lfi),var(--lfi-deep)); color:#fff; box-shadow:0 4px 14px rgba(229,18,59,.4)}
 .meta{display:flex; gap:8px; flex-wrap:wrap; margin:12px 0 14px}
