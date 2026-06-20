@@ -2,7 +2,7 @@
    - HTML : réseau d'abord (contenu frais depuis le cron), cache en secours (hors-ligne)
    - Assets (icônes, polices) : cache d'abord, réseau en secours
    Bump CACHE pour forcer le rafraîchissement du shell. */
-const CACHE = "casse-noisette-v2";
+const CACHE = "casse-noisette-v3";
 const SHELL = [
   "/",
   "/manifest.webmanifest",
