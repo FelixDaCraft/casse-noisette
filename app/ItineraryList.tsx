@@ -1,6 +1,6 @@
 'use client';
 import { useState, type ReactNode } from 'react';
-import { gmapsUrl, osmUrl, telegramUrl, cleanName, type Mode } from '@/lib/maps';
+import { gmapsUrl, telegramUrl, cleanName, type Mode } from '@/lib/maps';
 
 type Panel = { name: string; lat: number; lng: number };
 type It = { id: string; name: string; city: string | null; panels: Panel[] };
@@ -8,13 +8,6 @@ type It = { id: string; name: string; city: string | null; panels: Panel[] };
 const IconNav = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
     <polygon points="3 11 22 2 13 21 11 13 3 11" />
-  </svg>
-);
-const IconOsm = (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <polygon points="1 6 8 3 16 6 23 3 23 18 16 21 8 18 1 21" />
-    <line x1="8" y1="3" x2="8" y2="18" />
-    <line x1="16" y1="6" x2="16" y2="21" />
   </svg>
 );
 const IconTg = (
@@ -120,9 +113,6 @@ export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
                     {IconNav} Ouvrir dans Google Maps
                   </a>
                   <div className="alts">
-                    <a className="alt osm" href={osmUrl(it.panels, mode)} target="_blank" rel="noopener">
-                      {IconOsm} OpenStreetMap
-                    </a>
                     <a className="alt tg" href={telegramUrl(cleanName(it.name), gUrl)} target="_blank" rel="noopener">
                       {IconTg} Partager
                     </a>

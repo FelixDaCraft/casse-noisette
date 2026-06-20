@@ -27,20 +27,6 @@ export function gmapsUrl(panels: Coord[], mode: Mode): string {
   return u;
 }
 
-/** Lien OpenStreetMap : itinéraire multi-arrêts (moteur OSRM selon le mode). */
-export function osmUrl(panels: Coord[], mode: Mode): string {
-  if (panels.length === 0) return '#';
-  const eng =
-    mode === 'walking'
-      ? 'fossgis_osrm_foot'
-      : mode === 'bicycling'
-        ? 'fossgis_osrm_bike'
-        : 'fossgis_osrm_car';
-  return `https://www.openstreetmap.org/directions?engine=${eng}&route=${encodeURIComponent(
-    panels.map(latlng).join(';'),
-  )}`;
-}
-
 /** Lien de partage Telegram. */
 export function telegramUrl(name: string, gUrl: string): string {
   return `https://t.me/share/url?url=${encodeURIComponent(gUrl)}&text=${encodeURIComponent(

@@ -85,13 +85,12 @@ h1 em{font-style:italic; color:var(--lfi-2)}
 .cta:hover::after{transform:translateX(130%)}
 .cta:active{transform:scale(.985)}
 
-.alts{display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-top:8px}
+.alts{display:grid; grid-template-columns:1fr; gap:8px; margin-top:8px}
 .alt{display:flex; align-items:center; justify-content:center; gap:7px; text-decoration:none;
   padding:11px 6px; border-radius:11px; font:600 .82rem var(--font-inter); color:var(--txt);
   background:var(--glass-2); border:1px solid var(--stroke); transition:.25s}
 .alt svg{width:16px; height:16px; flex:0 0 auto}
 .alt:hover{transform:translateY(-2px); background:rgba(255,255,255,.13)}
-.alt.osm:hover{border-color:#7ebc6f; color:#b3ec9f}
 .alt.tg:hover{border-color:#3aa9e8; color:#88d3ff}
 
 details{margin-top:14px}

@@ -27,8 +27,7 @@ lance directement en navigation GPS, plus un vrai outil de gestion derrière.
 ## ✨ Fonctionnalités
 
 ### 🌍 Public (`/`)
-- 🗺️ **Google Maps** — itinéraire multi-arrêts + **lancement direct du GPS** (`dir_action=navigate`).
-- 🧭 **OpenStreetMap** — itinéraire multi-arrêts (moteur OSRM piéton / vélo / voiture).
+- 🗺️ **Google Maps** — itinéraire multi-arrêts + **lancement direct du GPS** (`dir_action=navigate`), toujours depuis la position de l'utilisateur.
 - 📨 **Partage Telegram** par itinéraire.
 - 🚶🚲🚗 Sélecteur de mode + option « depuis ma position ».
 - 💎 Design glassmorphism aux couleurs LFI (typographies *Fraunces* + *Inter*).
@@ -70,7 +69,7 @@ lance directement en navigation GPS, plus un vrai outil de gestion derrière.
         │                            ▼ SMTP (reset mdp)             │
         │                       ✉️  Resend                          │
         ▼                                                           │
-  🗺️ Google Maps / 🧭 OpenStreetMap / 📨 Telegram  ◄───────────────┘
+  🗺️ Google Maps  ·  📨 Telegram  ◄─────────────────────────────────┘
         (la navigation s'ouvre dans l'app/onglet du téléphone)
 
 
