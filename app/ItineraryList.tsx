@@ -84,7 +84,6 @@ export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
             </h2>
             {g.items.map((it, gi) => {
               const gUrl = gmapsUrl(it.panels, mode);
-              const stops = it.panels.length + 1; // + position GPS de départ
               return (
                 <article className="card" key={it.id} style={{ animationDelay: `${order++ * 60}ms` }}>
                   <h3>
@@ -92,7 +91,6 @@ export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
                   </h3>
                   <div className="meta">
                     <span className="badge">{it.panels.length} panneaux</span>
-                    {stops > 10 && <span className="badge warn">⚠ {stops} arrêts avec ta position</span>}
                   </div>
                   <a className="cta" href={gUrl} target="_blank" rel="noopener">
                     {IconNav} Ouvrir dans Google Maps
@@ -122,8 +120,7 @@ export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
         ))}
 
         <p className="foot">
-          La navigation démarre depuis ta position GPS vers chaque panneau, dans l&apos;ordre. Google
-          Maps limite à ~10 arrêts (ta position comprise).
+          La navigation démarre depuis ta position GPS vers chaque panneau, dans l&apos;ordre.
         </p>
       </div>
     </>
