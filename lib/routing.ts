@@ -23,9 +23,17 @@ export type Optimization = { results: ItineraryResult[]; pending: boolean };
 export type ItineraryResult = {
   id: string;
   order: number[]; // indices des panneaux d'entrée, dans l'ordre de visite
+  /** Coût total optimisé : approche depuis la position + tournée. */
   meters: number;
+  /** Longueur de la tournée seule, du premier au dernier panneau. */
+  tourMeters: number;
+  /** Durée de la tournée seule, en secondes ; null sans données OSRM. */
+  seconds: number | null;
   source: 'osrm' | 'haversine';
 };
+
+/** Matrices d'un itinéraire : distances (mètres) et durées (secondes). */
+type Paire = { d: number[][]; t: number[][] | null };
 
 const MATRIX_TTL_MS = 6 * 60 * 60 * 1000; // matrices inter-panneaux : quasi statiques
 const ORIGIN_TTL_MS = 10 * 60 * 1000; // lignes depuis une position : le militant bouge
@@ -114,11 +122,11 @@ function warmMatrices(missing: { key: string; panels: Coord[] }[], mode: Mode): 
         let off = 0;
         for (const b of batch) {
           const n = b.panels.length;
-          const sub = Array.from({ length: n }, (_, a) =>
-            Array.from({ length: n }, (_, c) => table[off + a][off + c]),
-          );
+          const coupe = (m: number[][]) =>
+            Array.from({ length: n }, (_, a) => Array.from({ length: n }, (_, c) => m[off + a][off + c]));
+          const sub = coupe(table.distances);
           if (sub.every((row) => row.every((v) => Number.isFinite(v)))) {
-            cacheSet(`m:${b.key}`, sub, MATRIX_TTL_MS);
+            cacheSet<Paire>(`m:${b.key}`, { d: sub, t: table.durations ? coupe(table.durations) : null }, MATRIX_TTL_MS);
           }
           off += n;
         }
@@ -129,18 +137,26 @@ function warmMatrices(missing: { key: string; panels: Coord[] }[], mode: Mode): 
   })();
 }
 
-/** Distances « ma position -> chaque panneau », en une requête (découpée si besoin). */
-async function fetchOriginLine(origin: Coord, points: Coord[], mode: Mode): Promise<number[]> {
-  const line: number[] = [];
+/** Distances et durées « ma position -> chaque panneau », en une requête. */
+async function fetchOriginLine(
+  origin: Coord,
+  points: Coord[],
+  mode: Mode,
+): Promise<{ d: number[]; t: number[] }> {
+  const d: number[] = [];
+  const t: number[] = [];
   for (let off = 0; off < points.length; off += DEST_CHUNK) {
     const slice = points.slice(off, off + DEST_CHUNK);
     const table = await osrmTable([origin, ...slice], mode, {
       sources: [0],
       destinations: slice.map((_, i) => i + 1),
     });
-    for (let j = 0; j < slice.length; j++) line.push(table ? table[0][j] : NaN);
+    for (let j = 0; j < slice.length; j++) {
+      d.push(table ? table.distances[0][j] : NaN);
+      t.push(table?.durations ? table.durations[0][j] : NaN);
+    }
   }
-  return line;
+  return { d, t };
 }
 
 export async function optimizeItineraries(
@@ -152,13 +168,13 @@ export async function optimizeItineraries(
 
   // 1) Matrices panneau↔panneau : celles du cache seulement. Les absentes sont
   //    lancées en arrière-plan, on ne fait pas patienter l'utilisateur.
-  const matrices = new Map<string, number[][] | null>();
+  const matrices = new Map<string, Paire | null>();
   const missing: { key: string; panels: Coord[] }[] = [];
   let pending = false;
   for (let i = 0; i < itineraries.length; i++) {
     const key = keys[i];
     if (matrices.has(key)) continue;
-    const cached = cacheGet<number[][]>(`m:${key}`);
+    const cached = cacheGet<Paire>(`m:${key}`);
     matrices.set(key, cached ?? null);
     if (!cached && itineraries[i].panels.length > 1) {
       missing.push({ key, panels: itineraries[i].panels });
@@ -169,12 +185,12 @@ export async function optimizeItineraries(
 
   // 2) Ligne « position → panneaux », en une requête groupée pour toute la page.
   const oKey = originKey(origin);
-  const fromOrigin = new Map<string, number[] | null>();
+  const fromOrigin = new Map<string, { d: number[]; t: number[] } | null>();
   const toFetch: { key: string; panels: Coord[] }[] = [];
   for (let i = 0; i < itineraries.length; i++) {
     const key = keys[i];
     if (fromOrigin.has(key)) continue;
-    const cached = cacheGet<number[]>(`o:${oKey}:${key}`);
+    const cached = cacheGet<{ d: number[]; t: number[] }>(`o:${oKey}:${key}`);
     if (cached) fromOrigin.set(key, cached);
     else toFetch.push({ key, panels: itineraries[i].panels });
   }
@@ -187,11 +203,12 @@ export async function optimizeItineraries(
     ? fetchOriginLine(origin, toFetch.flatMap((t) => t.panels), mode).then((l) => {
         let off = 0;
         for (const t of toFetch) {
-          const part = l.slice(off, off + t.panels.length);
-          if (part.length === t.panels.length && part.every((d) => Number.isFinite(d))) {
+          const n = t.panels.length;
+          const part = { d: l.d.slice(off, off + n), t: l.t.slice(off, off + n) };
+          if (part.d.length === n && part.d.every((x) => Number.isFinite(x))) {
             cacheSet(`o:${oKey}:${t.key}`, part, ORIGIN_TTL_MS);
           }
-          off += t.panels.length;
+          off += n;
         }
         return l;
       })
@@ -207,13 +224,13 @@ export async function optimizeItineraries(
 
   // Les matrices arrivées entre-temps sont maintenant dans le cache.
   for (const m of missing) {
-    const fresh = cacheGet<number[][]>(`m:${m.key}`);
+    const fresh = cacheGet<Paire>(`m:${m.key}`);
     if (fresh) matrices.set(m.key, fresh);
   }
   if (missing.every((m) => matrices.get(m.key))) pending = false;
 
   for (const t of toFetch) {
-    const part = cacheGet<number[]>(`o:${oKey}:${t.key}`) ?? null;
+    const part = cacheGet<{ d: number[]; t: number[] }>(`o:${oKey}:${t.key}`) ?? null;
     if (!part && !osrmPaused()) pending = true; // ça vaut le coup de redemander
     fromOrigin.set(t.key, part);
   }
@@ -222,9 +239,12 @@ export async function optimizeItineraries(
   const results = itineraries.map((it, i) => {
     const key = keys[i];
     const n = it.panels.length;
-    if (n === 0) return { id: it.id, order: [], meters: 0, source: 'haversine' as const };
+    if (n === 0)
+      return { id: it.id, order: [], meters: 0, tourMeters: 0, seconds: null, source: 'haversine' as const };
 
-    const matrix = matrices.get(key) ?? null;
+    const paire = matrices.get(key) ?? null;
+    const matrix = paire?.d ?? null;
+    const durees = paire?.t ?? null;
     const line = fromOrigin.get(key) ?? null;
     const fallback = haversineMatrix(it.panels);
 
@@ -233,7 +253,7 @@ export async function optimizeItineraries(
     const cost: number[][] = Array.from({ length: n + 1 }, () => new Array(n + 1).fill(0));
     let usedOsrm = true;
     for (let a = 0; a < n; a++) {
-      const d = line?.[a];
+      const d = line?.d[a];
       if (typeof d === 'number' && Number.isFinite(d)) cost[0][a + 1] = d;
       else {
         cost[0][a + 1] = haversine(origin, it.panels[a]);
@@ -250,7 +270,31 @@ export async function optimizeItineraries(
     }
 
     const { order, meters } = solveOpenPath(cost);
-    return { id: it.id, order, meters, source: usedOsrm ? ('osrm' as const) : ('haversine' as const) };
+
+    // Ce qu'on affiche, c'est la tournée elle-même : du premier au dernier
+    // panneau, sans le trajet pour s'y rendre. Sinon une tournée de 5 km à
+    // l'autre bout de la circo s'annoncerait à 17 km, ce qui n'aide personne.
+    // L'optimisation, elle, continue de tenir compte de l'approche.
+    let tourMeters = 0;
+    for (let k = 1; k < order.length; k++) tourMeters += cost[order[k - 1] + 1][order[k] + 1];
+
+    let seconds: number | null = null;
+    if (durees && order.length) {
+      let total = 0;
+      for (let k = 1; k < order.length && Number.isFinite(total); k++) {
+        total += durees[order[k - 1]]?.[order[k]] ?? NaN;
+      }
+      if (Number.isFinite(total)) seconds = Math.round(total);
+    }
+
+    return {
+      id: it.id,
+      order,
+      meters,
+      tourMeters: Math.round(tourMeters),
+      seconds,
+      source: usedOsrm ? ('osrm' as const) : ('haversine' as const),
+    };
   });
 
   return { results, pending };

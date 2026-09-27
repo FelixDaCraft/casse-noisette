@@ -20,7 +20,17 @@ export type Status =
 
 type Panel = { lat: number; lng: number };
 type Input = { id: string; panels: Panel[] };
-type ApiResult = { id: string; order: number[]; meters: number; source: 'osrm' | 'haversine' };
+type ApiResult = {
+  id: string;
+  order: number[];
+  meters: number;
+  tourMeters: number;
+  seconds: number | null;
+  source: 'osrm' | 'haversine';
+};
+
+/** Longueur et durée du parcours, pour l'affichage « 3,4 km · ≈ 45 min ». */
+export type Mesure = { meters: number; seconds: number | null };
 type ApiResponse = { results?: ApiResult[]; pending?: boolean };
 
 /** Délai avant de redemander un ordre affiné, et nombre maximum de tentatives. */
@@ -39,6 +49,8 @@ export type Optimization = {
   status: Status;
   /** id d'itinéraire -> ordre des indices de panneaux. Vide tant que rien n'est calculé. */
   orders: Record<string, number[]>;
+  /** id d'itinéraire -> longueur et durée du parcours retenu. */
+  mesures: Record<string, Mesure>;
   /** true si au moins un itinéraire a dû retomber sur le vol d'oiseau. */
   approx: boolean;
   /** true tant que les distances routières manquantes se calculent en arrière-plan. */
@@ -61,6 +73,7 @@ export function useOptimizedOrder(itineraries: Input[], mode: Mode): Optimizatio
   const [pos, setPos] = useState<{ lat: number; lng: number } | null>(null);
   const [status, setStatus] = useState<Status>('locating');
   const [orders, setOrders] = useState<Record<string, number[]>>({});
+  const [mesures, setMesures] = useState<Record<string, Mesure>>({});
   const [approx, setApprox] = useState(false);
   const [refining, setRefining] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -155,14 +168,17 @@ export function useOptimizedOrder(itineraries: Input[], mode: Mode): Optimizatio
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((data: ApiResponse) => {
         const next: Record<string, number[]> = {};
+        const mes: Record<string, Mesure> = {};
         let degraded = false;
         for (const r of data.results ?? []) {
           const it = courant.find((p) => p.id === r.id);
           if (!it || !isPermutation(r.order, it.panels.length)) continue;
           next[r.id] = r.order;
+          mes[r.id] = { meters: r.tourMeters ?? r.meters, seconds: r.seconds ?? null };
           if (r.source !== 'osrm') degraded = true;
         }
         setOrders(next);
+        setMesures(mes);
         setApprox(degraded);
         setStatus('ready');
 
@@ -189,5 +205,5 @@ export function useOptimizedOrder(itineraries: Input[], mode: Mode): Optimizatio
     refines.current = 0;
   }, [mode]);
 
-  return { status, orders, approx, refining, retry };
+  return { status, orders, mesures, approx, refining, retry };
 }

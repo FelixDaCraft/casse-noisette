@@ -1,33 +1,28 @@
 'use client';
 import { useMemo, useState, type ReactNode } from 'react';
-import { gmapsUrl, telegramUrl, cleanName, isAutoName, type Mode } from '@/lib/maps';
-import { useOptimizedOrder, type Status } from './useOptimizedOrder';
+import { gmapsUrl, cleanName, isAutoName, type Mode } from '@/lib/maps';
+import { useOptimizedOrder, type Status, type Mesure } from './useOptimizedOrder';
+import Marque, { DuoVioletDef } from './Marque';
 
 type Panel = { name: string; lat: number; lng: number };
 type Kind = 'circo' | 'ville';
 type It = { id: string; name: string; city: string | null; kind: Kind; panels: Panel[] };
 
-const VUE: { kind: Kind; label: string; aide: string }[] = [
-  { kind: 'ville', label: 'Par commune', aide: 'Tournées courtes, une seule commune à la fois' },
-  { kind: 'circo', label: '4ᵉ circonscription', aide: 'Tournées des législatives, plusieurs communes' },
+const VUE: { kind: Kind; label: string }[] = [
+  { kind: 'ville', label: 'Par commune' },
+  { kind: 'circo', label: '4ᵉ circonscription' },
 ];
 
 const IconNav = (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
     <polygon points="3 11 22 2 13 21 11 13 3 11" />
   </svg>
 );
-const IconTg = (
-  <svg viewBox="0 0 24 24" fill="currentColor">
-    <path d="M21.9 4.3 18.7 19.4c-.2 1-.86 1.26-1.74.78l-4.86-3.58-2.34 2.26c-.26.26-.48.48-.98.48l.35-4.96 9.04-8.17c.4-.35-.08-.55-.6-.2L6.4 13.06l-4.8-1.5c-1.04-.32-1.06-1.04.22-1.54l18.74-7.22c.86-.32 1.62.2 1.34 1.5z" />
-  </svg>
-);
 const IconChev = (
-  <svg className="chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+  <svg viewBox="0 0 24 24" width={20} height={20} fill="none" stroke="var(--violet)" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
     <polyline points="9 18 15 12 9 6" />
   </svg>
 );
-
 const IconWalk = (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
     <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9 7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7z" />
@@ -48,177 +43,237 @@ const MODE: Record<Mode, { label: string; icon: ReactNode }> = {
   bicycling: { label: 'Vélo', icon: IconBike },
   driving: { label: 'Voiture', icon: IconCar },
 };
+const MODES: Mode[] = ['walking', 'bicycling', 'driving'];
 
-const IconPin = (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z" />
-    <circle cx="12" cy="10" r="2.6" />
-  </svg>
-);
-
-/** Message affiché sous les modes : dit d'où part le calcul, et pourquoi le cas échéant il n'a pas eu lieu. */
+/** Texte de la pastille de géolocalisation, dans le bandeau. */
 function geoLabel(status: Status, approx: boolean, refining: boolean): string {
   switch (status) {
     case 'asking':
-      return 'Autorise la localisation pour adapter l’ordre à ton point de départ';
+      return 'Autorise la localisation';
     case 'locating':
       return 'Recherche de ta position…';
     case 'optimizing':
-      return 'Calcul du meilleur ordre de passage…';
+      return 'Calcul du meilleur ordre…';
     case 'ready':
-      if (refining) return 'Ordre adapté à ta position — affinage par la route…';
-      return approx
-        ? 'Ordre adapté à ta position (distances estimées à vol d’oiseau)'
-        : 'Ordre adapté à ta position, par la route';
+      if (refining) return 'Affinage par la route…';
+      return approx ? 'Ordre adapté (à vol d’oiseau)' : 'Ordre adapté à ta position';
     case 'denied':
-      return 'Position refusée — ordre par défaut';
+      return 'Position refusée · ordre par défaut';
     case 'unavailable':
-      return 'Position indisponible — ordre par défaut';
+      return 'Position indisponible · ordre par défaut';
     case 'failed':
-      return 'Calcul indisponible — ordre par défaut';
+      return 'Calcul indisponible · ordre par défaut';
   }
 }
 
+/** Couleur du point : jaune en cours, vert prêt, rose refusé. */
+function geoPoint(status: Status): string {
+  if (status === 'ready') return 'pret';
+  if (status === 'denied' || status === 'unavailable' || status === 'failed') return 'refus';
+  return 'attente';
+}
+
+const km = (m: number) =>
+  m < 950 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1).replace('.', ',')} km`;
+const duree = (s: number) =>
+  s < 3600
+    ? `≈ ${Math.max(1, Math.round(s / 60))} min`
+    : `≈ ${Math.floor(s / 3600)} h ${String(Math.round((s % 3600) / 60)).padStart(2, '0')}`;
+
 export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
-  const [mode, setMode] = useState<Mode>('driving');
-  // Les tournées par commune sont celles du quotidien : c'est la vue par défaut.
+  // Le collage urbain se fait à pied : c'est le mode par défaut de la charte.
+  const [mode, setMode] = useState<Mode>('walking');
   const [vue, setVue] = useState<Kind>(
     itineraries.some((it) => it.kind === 'ville') ? 'ville' : 'circo',
   );
-  const visibles = useMemo(() => itineraries.filter((it) => it.kind === vue), [itineraries, vue]);
-  const total = visibles.reduce((s, it) => s + it.panels.length, 0);
-  const compte = (k: Kind) => itineraries.filter((it) => it.kind === k).length;
-  const { status, orders, approx, refining, retry } = useOptimizedOrder(visibles, mode);
-  const canRetry = status === 'denied' || status === 'unavailable' || status === 'failed';
-  // `asking` n'est pas une erreur : le navigateur attend une réponse, pas un clic de plus.
+  const [commune, setCommune] = useState<string | null>(null);
 
-  // Regroupement par commune (la liste arrive déjà triée : commune puis position).
-  const groups: { city: string; items: It[] }[] = [];
+  const duVue = useMemo(() => itineraries.filter((it) => it.kind === vue), [itineraries, vue]);
+  const communes = useMemo(
+    () =>
+      [...new Set(duVue.map((it) => it.city?.trim() || 'Autres'))].sort((a, b) =>
+        a.localeCompare(b, 'fr'),
+      ),
+    [duVue],
+  );
+  const visibles = useMemo(
+    () => (commune ? duVue.filter((it) => (it.city?.trim() || 'Autres') === commune) : duVue),
+    [duVue, commune],
+  );
+
+  const { status, orders, mesures, approx, refining, retry } = useOptimizedOrder(visibles, mode);
+  const compte = (k: Kind) => itineraries.filter((it) => it.kind === k).length;
+  const canRetry = status === 'denied' || status === 'unavailable' || status === 'failed';
+
+  // Regroupement par commune : la liste arrive déjà triée.
+  const groupes: { city: string; items: It[] }[] = [];
   for (const it of visibles) {
-    const c = it.city && it.city.trim() ? it.city.trim() : 'Autres';
-    const last = groups[groups.length - 1];
+    const c = it.city?.trim() || 'Autres';
+    const last = groupes[groupes.length - 1];
     if (last && last.city === c) last.items.push(it);
-    else groups.push({ city: c, items: [it] });
+    else groupes.push({ city: c, items: [it] });
   }
 
-  let order = 0; // index global pour échelonner l'animation d'entrée
+  const changerVue = (k: Kind) => {
+    setVue(k);
+    setCommune(null); // les communes ne sont pas les mêmes d'une vue à l'autre
+  };
 
   return (
-    <>
-      <div className="bg" />
-      <div className="phi">φ</div>
-      <div className="wrap">
-        <header className="hd">
-          <div className="kicker">
-            <span className="dot" /> 4ᵉ circonscription · Loire-Atlantique
-          </div>
-          <h1>
-            Itinéraires de <em>collage</em>
-          </h1>
-          <p className="sub">
-            {visibles.length} itinéraires · {total} panneaux · {groups.length} commune
-            {groups.length > 1 ? 's' : ''}. La navigation démarre depuis ta position GPS, et
-            les panneaux sont réordonnés pour que le trajet soit le plus court depuis là où tu es.
-          </p>
-        </header>
+    <div className="page">
+      <DuoVioletDef />
 
-        <div className="vues" role="tablist" aria-label="Type de tournée">
+      <header className="hd">
+        <div className="hd-marque">
+          <Marque size={40} />
+          <span className="hd-nom">Casse-Noisette</span>
+        </div>
+        <h1>
+          On colle où <em>aujourd’hui&nbsp;?</em>
+        </h1>
+        <p className="hd-sous prose">
+          Choisis une tournée : on calcule l’ordre de passage le plus court depuis ta position.
+        </p>
+        <div className="geo-ligne">
+          <div className="geo" aria-live="polite">
+            <span className={'geo-point ' + geoPoint(status)} />
+            {geoLabel(status, approx, refining)}
+          </div>
+          {canRetry && (
+            <button type="button" className="geo-retry" onClick={retry}>
+              Réessayer
+            </button>
+          )}
+        </div>
+      </header>
+
+      <div className="modes">
+        {MODES.map((m) => (
+          <button
+            key={m}
+            className={'mode' + (mode === m ? ' actif' : '')}
+            onClick={() => setMode(m)}
+            aria-pressed={mode === m}
+            title={MODE[m].label}
+          >
+            {MODE[m].icon}
+            <span>{MODE[m].label}</span>
+          </button>
+        ))}
+      </div>
+
+      <div style={{ padding: '22px 16px 0' }}>
+        <div className="vues" role="tablist">
           {VUE.filter((v) => compte(v.kind) > 0).map((v) => (
             <button
               key={v.kind}
               role="tab"
+              className="vue"
               aria-selected={vue === v.kind}
-              className={'vue-btn' + (vue === v.kind ? ' active' : '')}
-              onClick={() => setVue(v.kind)}
-              title={v.aide}
+              onClick={() => changerVue(v.kind)}
             >
-              {v.label} <span className="vue-cnt">{compte(v.kind)}</span>
+              {v.label}
+              <span className="vue-cnt">{compte(v.kind)}</span>
             </button>
           ))}
         </div>
 
-        <div className="controls">
-          <div className="modes">
-            {(['walking', 'bicycling', 'driving'] as Mode[]).map((m) => (
+        {vue === 'ville' && communes.length >= 2 && (
+          <div className="chips">
+            <button
+              className={'chip' + (commune === null ? ' actif' : '')}
+              onClick={() => setCommune(null)}
+            >
+              Toutes
+            </button>
+            {communes.map((c) => (
               <button
-                key={m}
-                className={'mode-btn' + (mode === m ? ' active' : '')}
-                onClick={() => setMode(m)}
-                title={MODE[m].label}
-                aria-label={MODE[m].label}
-                aria-pressed={mode === m}
+                key={c}
+                className={'chip' + (commune === c ? ' actif' : '')}
+                onClick={() => setCommune(c)}
               >
-                {MODE[m].icon}
+                {c}
               </button>
             ))}
           </div>
-          <p className={'geo geo-' + (refining ? 'optimizing' : status)} aria-live="polite">
-            <span className="geo-ico">{IconPin}</span>
-            {geoLabel(status, approx, refining)}
-            {canRetry && (
-              <button type="button" className="geo-retry" onClick={retry}>
-                Réessayer
-              </button>
-            )}
-          </p>
-        </div>
+        )}
+      </div>
 
-        {visibles.length === 0 && <p className="muted">Aucun itinéraire pour le moment.</p>}
+      <main className="corps">
+        {visibles.length === 0 && <p className="vide">Aucune tournée pour le moment.</p>}
 
-        {groups.map((g) => (
-          <section key={g.city}>
-            <h2 className="city-head">
-              <span className="pin">📍</span> {g.city} <span className="cnt">{g.items.length} itin.</span>
+        {groupes.map((g) => (
+          <section className="groupe" key={g.city}>
+            <h2>
+              {g.city}
+              <span>
+                {g.items.length} tournée{g.items.length > 1 ? 's' : ''}
+              </span>
             </h2>
-            {g.items.map((it, gi) => {
-              // Ordre calculé depuis la position si on l'a, sinon celui du backoffice.
-              const ord = orders[it.id];
-              const panels = ord ? ord.map((i) => it.panels[i]) : it.panels;
-              const gUrl = gmapsUrl(panels, mode);
-              // Un nom auto « de X à Y » ne décrit plus le parcours une fois réordonné :
-              // on le recalcule sur les extrémités réelles. Un nom saisi à la main est respecté.
-              const title =
-                ord && panels.length > 1 && isAutoName(it.name)
-                  ? `${panels[0].name || 'Départ'} → ${panels[panels.length - 1].name || 'Arrivée'}`
-                  : cleanName(it.name);
-              return (
-                <article className="card" key={it.id} style={{ animationDelay: `${order++ * 60}ms` }}>
-                  <h3>
-                    <span className="num">{gi + 1}</span> {title}
-                  </h3>
-                  <div className="meta">
-                    <span className="badge">{panels.length} panneaux</span>
-                    {ord && <span className="badge badge-opt">ordre optimisé</span>}
-                  </div>
-                  <a className="cta" href={gUrl} target="_blank" rel="noopener">
-                    {IconNav} Ouvrir dans Google Maps
-                  </a>
-                  <div className="alts">
-                    <a className="alt tg" href={telegramUrl(title, gUrl)} target="_blank" rel="noopener">
-                      {IconTg} Partager
-                    </a>
-                  </div>
-                  <details>
-                    <summary>
-                      {IconChev} Voir les {panels.length} panneaux
-                    </summary>
-                    <ol>
-                      {panels.map((p, i) => (
-                        <li key={i}>{p.name || 'Panneau ' + (i + 1)}</li>
-                      ))}
-                    </ol>
-                  </details>
-                </article>
-              );
-            })}
+            <div className="liste">
+              {g.items.map((it, i) => (
+                <Carte
+                  key={it.id}
+                  it={it}
+                  num={i + 1}
+                  mode={mode}
+                  ordre={orders[it.id]}
+                  mesure={mesures[it.id]}
+                />
+              ))}
+            </div>
           </section>
         ))}
 
-        <p className="foot">
-          La navigation démarre depuis ta position GPS et enchaîne les panneaux dans l&apos;ordre
-          le plus court depuis ton point de départ.
+        <p className="pied prose">
+          La navigation démarre depuis ta position et enchaîne les panneaux dans l’ordre le plus
+          court.
         </p>
-      </div>
-    </>
+      </main>
+    </div>
+  );
+}
+
+function Carte({
+  it,
+  num,
+  mode,
+  ordre,
+  mesure,
+}: {
+  it: It;
+  num: number;
+  mode: Mode;
+  ordre?: number[];
+  mesure?: Mesure;
+}) {
+  const panels = ordre ? ordre.map((i) => it.panels[i]) : it.panels;
+  const url = gmapsUrl(panels, mode);
+  // Un nom auto « de X à Y » ne décrit plus le parcours une fois réordonné :
+  // on le recalcule sur les extrémités réelles, un nom saisi à la main est gardé.
+  const titre =
+    ordre && panels.length > 1 && isAutoName(it.name)
+      ? `${panels[0].name || 'Départ'} → ${panels[panels.length - 1].name || 'Arrivée'}`
+      : cleanName(it.name);
+
+  return (
+    <article className="tournee">
+      <a className="tournee-ouvrir" href={url} target="_blank" rel="noopener">
+        <span className="tournee-num">{num}</span>
+        <span className="tournee-txt">
+          <span className="tournee-titre">{titre}</span>
+          <span className="tournee-meta">
+            <span>{panels.length} panneaux</span>
+            {mesure && <span>{km(mesure.meters)}</span>}
+            {mesure?.seconds != null && <span>{duree(mesure.seconds)}</span>}
+          </span>
+        </span>
+        <span className="tournee-chev">{IconChev}</span>
+      </a>
+      <a className="tournee-gps" href={url} target="_blank" rel="noopener" aria-label="Lancer le GPS">
+        {IconNav}
+        GPS
+      </a>
+    </article>
   );
 }

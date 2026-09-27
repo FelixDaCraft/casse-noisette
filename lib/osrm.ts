@@ -46,6 +46,8 @@ const BREAKER_MS = 3 * 60 * 1000;
 const UA = process.env.OSRM_USER_AGENT || 'casse-noisette/1.0 (+https://casse-noisette.aynn.fr)';
 
 export type LngLat = { lat: number; lng: number };
+/** Distances en mètres et durées en secondes, même indexation. */
+export type Table = { distances: number[][]; durations: number[][] | null };
 
 type Breaker = { chain: Promise<unknown>; last: number; fails: number; openUntil: number };
 const state = ((globalThis as any).__cnOsrm ??= {
@@ -85,11 +87,14 @@ export async function osrmTable(
   coords: LngLat[],
   mode: Mode,
   opts: { sources?: number[]; destinations?: number[] } = {},
-): Promise<number[][] | null> {
+): Promise<Table | null> {
   if (coords.length < 2 || osrmPaused()) return null;
 
   const path = coords.map((c) => `${round6(c.lng)},${round6(c.lat)}`).join(';');
-  const qs = new URLSearchParams({ annotations: 'distance' });
+  // Les durées servent à afficher « ≈ 45 min » sur les cartes de tournée ;
+  // elles tiennent compte du mode (marche, vélo, voiture), pas seulement de la
+  // distance. Même requête, aucun appel supplémentaire.
+  const qs = new URLSearchParams({ annotations: 'distance,duration' });
   if (opts.sources) qs.set('sources', opts.sources.join(';'));
   if (opts.destinations) qs.set('destinations', opts.destinations.join(';'));
 
@@ -118,7 +123,7 @@ export async function osrmTable(
   return null;
 }
 
-async function call(url: string): Promise<number[][] | null> {
+async function call(url: string): Promise<Table | null> {
   try {
     const res = await fetch(url, {
       headers: { 'User-Agent': UA, Accept: 'application/json' },
@@ -126,11 +131,19 @@ async function call(url: string): Promise<number[][] | null> {
       cache: 'no-store',
     });
     if (!res.ok) return null; // 429 compris : on laisse le disjoncteur décider
-    const body = (await res.json()) as { code?: string; distances?: (number | null)[][] };
+    const body = (await res.json()) as {
+      code?: string;
+      distances?: (number | null)[][];
+      durations?: (number | null)[][];
+    };
     if (body.code !== 'Ok' || !Array.isArray(body.distances)) return null;
-    // Une distance `null` signale un point non rattaché au réseau : on la laisse
+    // Une valeur `null` signale un point non rattaché au réseau : on la laisse
     // remonter en NaN pour que l'appelant retombe sur le vol d'oiseau pour cette paire.
-    return body.distances.map((row) => row.map((d) => (typeof d === 'number' ? d : NaN)));
+    const nb = (m: (number | null)[][]) => m.map((row) => row.map((d) => (typeof d === 'number' ? d : NaN)));
+    return {
+      distances: nb(body.distances),
+      durations: Array.isArray(body.durations) ? nb(body.durations) : null,
+    };
   } catch {
     return null; // timeout, DNS, hors-ligne
   }
