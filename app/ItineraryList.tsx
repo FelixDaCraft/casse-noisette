@@ -1,8 +1,9 @@
 'use client';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { gmapsUrl, cleanName, isAutoName, type Mode } from '@/lib/maps';
 import { useOptimizedOrder, type Status, type Mesure } from './useOptimizedOrder';
 import Marque, { DuoVioletDef } from './Marque';
+import TourneeDetail, { type NoteOrdre } from './TourneeDetail';
 
 type Panel = { name: string; lat: number; lng: number };
 type Kind = 'circo' | 'ville';
@@ -101,7 +102,28 @@ export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
     [duVue, commune],
   );
 
-  const { status, orders, mesures, approx, refining, retry } = useOptimizedOrder(visibles, mode);
+  const [ouverte, setOuverte] = useState<string | null>(null);
+  const { status, orders, mesures, approx, refining, retry, position } = useOptimizedOrder(
+    visibles,
+    mode,
+  );
+
+  // Le détail est une vue, pas une page : on garde l'ordre déjà calculé et la
+  // position, sans recharger. Une entrée d'historique rend le retour du
+  // navigateur naturel.
+  const fermer = useCallback(() => {
+    if (typeof history !== 'undefined' && history.state?.cnDetail) history.back();
+    else setOuverte(null);
+  }, []);
+  const ouvrir = useCallback((id: string) => {
+    setOuverte(id);
+    history.pushState({ cnDetail: true }, '');
+  }, []);
+  useEffect(() => {
+    const onPop = () => setOuverte(null);
+    addEventListener('popstate', onPop);
+    return () => removeEventListener('popstate', onPop);
+  }, []);
   const compte = (k: Kind) => itineraries.filter((it) => it.kind === k).length;
   const canRetry = status === 'denied' || status === 'unavailable' || status === 'failed';
 
@@ -118,6 +140,50 @@ export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
     setVue(k);
     setCommune(null); // les communes ne sont pas les mêmes d'une vue à l'autre
   };
+
+  const selection = ouverte ? visibles.find((it) => it.id === ouverte) : undefined;
+  if (selection) {
+    const ordre = orders[selection.id];
+    const panels = ordre ? ordre.map((i) => selection.panels[i]) : selection.panels;
+    const titre =
+      ordre && panels.length > 1 && isAutoName(selection.name)
+        ? `${panels[0].name || 'Départ'} → ${panels[panels.length - 1].name || 'Arrivée'}`
+        : cleanName(selection.name);
+    const commune = selection.city?.trim() || 'Autres';
+    const note: NoteOrdre =
+      status === 'optimizing' || refining
+        ? { texte: 'Calcul en cours…', ton: 'attente' }
+        : ordre
+          ? { texte: 'Optimisé depuis ta position', ton: 'ok' }
+          : { texte: 'Ordre par défaut', ton: 'neutre' };
+
+    return (
+      <div className="page">
+        <DuoVioletDef />
+        <TourneeDetail
+          titre={titre}
+          kicker={selection.kind === 'circo' ? `4ᵉ circo · ${commune}` : commune}
+          panels={panels}
+          mode={mode}
+          mesure={mesures[selection.id]}
+          note={note}
+          position={position}
+          onRetour={fermer}
+          modes={MODES.map((m) => (
+            <button
+              key={m}
+              className={'mode' + (mode === m ? ' actif' : '')}
+              onClick={() => setMode(m)}
+              aria-pressed={mode === m}
+            >
+              {MODE[m].icon}
+              <span>{MODE[m].label}</span>
+            </button>
+          ))}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="page">
@@ -219,6 +285,7 @@ export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
                   mode={mode}
                   ordre={orders[it.id]}
                   mesure={mesures[it.id]}
+                  onOuvrir={() => ouvrir(it.id)}
                 />
               ))}
             </div>
@@ -240,12 +307,14 @@ function Carte({
   mode,
   ordre,
   mesure,
+  onOuvrir,
 }: {
   it: It;
   num: number;
   mode: Mode;
   ordre?: number[];
   mesure?: Mesure;
+  onOuvrir: () => void;
 }) {
   const panels = ordre ? ordre.map((i) => it.panels[i]) : it.panels;
   const url = gmapsUrl(panels, mode);
@@ -258,7 +327,7 @@ function Carte({
 
   return (
     <article className="tournee">
-      <a className="tournee-ouvrir" href={url} target="_blank" rel="noopener">
+      <button type="button" className="tournee-ouvrir" onClick={onOuvrir}>
         <span className="tournee-num">{num}</span>
         <span className="tournee-txt">
           <span className="tournee-titre">{titre}</span>
@@ -269,7 +338,7 @@ function Carte({
           </span>
         </span>
         <span className="tournee-chev">{IconChev}</span>
-      </a>
+      </button>
       <a className="tournee-gps" href={url} target="_blank" rel="noopener" aria-label="Lancer le GPS">
         {IconNav}
         GPS

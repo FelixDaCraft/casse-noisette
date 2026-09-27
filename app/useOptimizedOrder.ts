@@ -55,6 +55,8 @@ export type Optimization = {
   approx: boolean;
   /** true tant que les distances routières manquantes se calculent en arrière-plan. */
   refining: boolean;
+  /** Position de l'utilisateur, pour la situer sur la carte du détail. */
+  position: { lat: number; lng: number } | null;
   retry: () => void;
 };
 
@@ -205,5 +207,5 @@ export function useOptimizedOrder(itineraries: Input[], mode: Mode): Optimizatio
     refines.current = 0;
   }, [mode]);
 
-  return { status, orders, mesures, approx, refining, retry };
+  return { status, orders, mesures, approx, refining, retry, position: pos };
 }

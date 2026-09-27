@@ -454,3 +454,302 @@ button {
   color: var(--gris);
   font-size: 15px;
 }
+
+/* ─── Détail d'une tournée ──────────────────────────────────────────────── */
+
+.detail-carte {
+  position: relative;
+  height: 46vh;
+  min-height: 300px;
+  max-height: 460px;
+  background: #efe9dc;
+}
+.detail-map {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+.leaflet-container {
+  background: #efe9dc;
+  font-family: var(--font-sans), sans-serif;
+}
+.leaflet-control-attribution {
+  font-size: 9px !important;
+}
+
+/* Marqueur numéroté et position de l'utilisateur (injectés par Leaflet). */
+.cn-marker {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--violet);
+  border: 2.5px solid var(--creme);
+  color: var(--creme);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 900 12px var(--font-sans), sans-serif;
+  box-shadow: 0 2px 6px rgba(33, 35, 32, 0.3);
+}
+.cn-moi {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(209, 39, 28, 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cn-moi::after {
+  content: '';
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--rouge);
+  border: 2px solid #fff;
+}
+
+.detail-actions {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  z-index: 500;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+.rond {
+  pointer-events: auto;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 0;
+  background: #fff;
+  color: var(--charbon);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: var(--ombre-flottant);
+}
+.partage {
+  pointer-events: auto;
+  height: 46px;
+  padding: 0 16px;
+  border-radius: var(--pill);
+  background: #fff;
+  color: var(--charbon);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 14px;
+  box-shadow: var(--ombre-flottant);
+}
+.partage:hover {
+  color: var(--violet);
+}
+
+.feuille {
+  position: relative;
+  z-index: 10;
+  margin-top: -22px;
+  background: var(--creme);
+  border-radius: var(--r-feuille) var(--r-feuille) 0 0;
+  padding: 22px 18px 130px;
+}
+.poignee {
+  width: 40px;
+  height: 4px;
+  border-radius: 4px;
+  background: var(--bord-champ);
+  margin: -10px auto 16px;
+}
+.kicker {
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--rouge);
+}
+.detail-titre {
+  margin: 6px 0 16px;
+  font-weight: 900;
+  font-size: 26px;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.stat {
+  background: var(--blanc);
+  border: 1px solid var(--bord-carte);
+  border-radius: 14px;
+  padding: 12px;
+}
+.stat-val {
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--violet);
+}
+.stat-lib {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gris);
+}
+
+.modes-compact {
+  margin-top: 12px;
+  background: var(--blanc);
+  border-radius: 14px;
+  border: 1px solid var(--bord-carte);
+  padding: 5px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+.modes-compact .mode {
+  flex-direction: row;
+  gap: 6px;
+  padding: 8px 4px;
+  font-size: 12px;
+}
+.modes-compact .mode svg {
+  width: 18px;
+  height: 18px;
+}
+
+.ordre-tete {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 26px 2px 12px;
+}
+.ordre-tete h2 {
+  margin: 0;
+  font-weight: 900;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--violet);
+}
+.note {
+  font-size: 12px;
+  font-weight: 700;
+}
+.note-ok {
+  color: var(--succes-vif);
+}
+.note-neutre {
+  color: var(--gris);
+}
+.note-attente {
+  color: var(--gris);
+  opacity: 0.8;
+}
+
+.frise {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+.frise-ligne {
+  position: absolute;
+  left: 15px;
+  top: 16px;
+  bottom: 16px;
+  width: 2px;
+  background: var(--violet-18);
+}
+.frise li {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 0;
+}
+.frise-rond {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--violet);
+  color: var(--creme);
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 13px;
+  box-shadow: 0 0 0 3px var(--creme);
+}
+.frise-rond-moi {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--rouge);
+  display: grid;
+  place-items: center;
+}
+.frise-rond-moi span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--rouge);
+}
+.frise-nom {
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1.3;
+}
+.frise-moi .frise-nom {
+  font-weight: 700;
+  color: var(--rouge);
+}
+
+.cta-zone {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 600;
+  pointer-events: none;
+}
+.cta-inner {
+  max-width: var(--largeur-public);
+  margin: 0 auto;
+  padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+  background: linear-gradient(rgba(255, 252, 244, 0), var(--creme) 30%);
+  pointer-events: auto;
+}
+.cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 60px;
+  border-radius: var(--pill);
+  background: var(--rouge);
+  color: #fff;
+  text-decoration: none;
+  font-weight: 900;
+  font-size: 17px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  box-shadow: var(--ombre-cta);
+}
+.cta:hover {
+  background: var(--rouge-hover);
+  color: #fff;
+}
+.cta:active {
+  transform: scale(0.98);
+}
