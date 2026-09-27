@@ -1,11 +1,12 @@
 import ForgotForm from './ForgotForm';
+import AuthShell from '../AuthShell';
 
 export const dynamic = 'force-dynamic';
 
 export default function ForgotPage() {
   return (
-    <div className="login-wrap">
+    <AuthShell>
       <ForgotForm />
-    </div>
+    </AuthShell>
   );
 }

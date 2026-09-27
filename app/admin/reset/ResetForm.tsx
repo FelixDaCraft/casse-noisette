@@ -5,19 +5,23 @@ import { performReset } from '../actions';
 export default function ResetForm({ token }: { token: string }) {
   const [state, action, pending] = useActionState(performReset, undefined);
   return (
-    <form action={action} className="login-card">
-      <input type="hidden" name="token" value={token} />
-      <h1 style={{ fontSize: '1.4rem', margin: '0 0 .8em' }}>Nouveau mot de passe</h1>
-      <label className="fld" htmlFor="password">Nouveau mot de passe (8 caractères min.)</label>
-      <input id="password" name="password" type="password" autoComplete="new-password" required minLength={8} />
-      <div style={{ height: 12 }} />
-      <label className="fld" htmlFor="confirm">Confirmer</label>
-      <input id="confirm" name="confirm" type="password" autoComplete="new-password" required minLength={8} />
-      {state?.error && <p className="err">{state.error}</p>}
-      <div style={{ height: 16 }} />
-      <button className="btn primary" style={{ width: '100%', justifyContent: 'center' }} disabled={pending}>
-        {pending ? 'Enregistrement…' : 'Changer le mot de passe'}
-      </button>
-    </form>
+    <>
+      <h2>Nouveau mot de passe</h2>
+      <form action={action}>
+        <input type="hidden" name="token" value={token} />
+        <label className="champ">
+          Nouveau mot de passe <span className="aide">8 caractères minimum</span>
+          <input name="password" type="password" autoComplete="new-password" required minLength={8} />
+        </label>
+        <label className="champ">
+          Confirmer
+          <input name="confirm" type="password" autoComplete="new-password" required minLength={8} />
+        </label>
+        {state?.error && <p className="erreur">{state.error}</p>}
+        <button className="btn-auth" disabled={pending}>
+          {pending ? 'Enregistrement…' : 'Changer le mot de passe'}
+        </button>
+      </form>
+    </>
   );
 }

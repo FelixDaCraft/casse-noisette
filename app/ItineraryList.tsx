@@ -197,9 +197,6 @@ export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
         <h1>
           On colle où <em>aujourd’hui&nbsp;?</em>
         </h1>
-        <p className="hd-sous prose">
-          Choisis une tournée : on calcule l’ordre de passage le plus court depuis ta position.
-        </p>
         <div className="geo-ligne">
           <div className="geo" aria-live="polite">
             <span className={'geo-point ' + geoPoint(status)} />

@@ -12,6 +12,7 @@ import {
   deleteItinerary,
 } from '../../actions';
 import { MAX_PANELS } from '@/lib/maps';
+import Confirm from '../../Confirm';
 
 type P = { id: string; name: string; lat: number; lng: number };
 
@@ -26,9 +27,14 @@ export default function Editor({
   const [name, setName] = useState(itinerary.name);
   const [city, setCity] = useState(itinerary.city ?? '');
   const [panels, setPanels] = useState<P[]>(itinerary.panels);
+  const [kind, setKind] = useState<'circo' | 'ville'>(itinerary.kind);
   const [notice, setNotice] = useState('');
+  const [aRetirer, setARetirer] = useState<P | null>(null);
+  const [supprTournee, setSupprTournee] = useState(false);
   const [, start] = useTransition();
   const full = panels.length >= MAX_PANELS;
+  const modifie =
+    name !== itinerary.name || city !== (itinerary.city ?? '') || kind !== itinerary.kind;
 
   const mapEl = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
@@ -86,11 +92,9 @@ export default function Editor({
       const icon = L.divIcon({
         className: '',
         html:
-          `<div class="cn-pin" style="width:26px;height:26px;border-radius:50%;` +
-          `background:linear-gradient(135deg,#e5123b,#a30b29);border:2px solid #fff;color:#fff;` +
-          `display:flex;align-items:center;justify-content:center;font:700 12px sans-serif">${i + 1}</div>`,
-        iconSize: [26, 26],
-        iconAnchor: [13, 13],
+          `<div class="cn-marker">${i + 1}</div>`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 15],
       });
       const m = L.marker([p.lat, p.lng], { draggable: true, icon }).addTo(layer);
       m.bindTooltip(p.name || `Panneau ${i + 1}`);
@@ -128,7 +132,7 @@ export default function Editor({
   }
   function onDelete(id: string) {
     setPanels((prev) => prev.filter((p) => p.id !== id));
-    start(async () => { await deletePanel(id); });
+    start(async () => { await deletePanel(id, itinerary.id); });
   }
   function onReorder(id: string, dir: 'up' | 'down') {
     setPanels((prev) => {
@@ -139,113 +143,123 @@ export default function Editor({
       [c[i], c[j]] = [c[j], c[i]];
       return c;
     });
-    start(async () => { await movePanel(id, dir); });
+    start(async () => { await movePanel(id, dir, itinerary.id); });
   }
 
   return (
-    <>
-      <p style={{ margin: '0 0 10px' }}>
-        <Link href="/admin" className="muted">
-          ← Tous les itinéraires
-        </Link>
-      </p>
+    <div className="admin-xl">
+      <Link href="/admin" className="lien-sobre" style={{ marginTop: 0, textDecoration: 'none' }}>
+        ← Toutes les tournées
+      </Link>
 
-      <div className="panel">
-        <div className="row">
-          <input
-            className="grow"
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            aria-label="Nom de l'itinéraire"
-          />
-          <input
-            type="text"
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-            placeholder="Ville"
-            aria-label="Ville"
-            style={{ maxWidth: 180 }}
-          />
+      <div className="carte-form" style={{ marginTop: 14 }}>
+        <label className="champ" style={{ flex: '2 1 240px' }}>
+          Nom de la tournée
+          <input value={name} onChange={(e) => setName(e.target.value)} />
+        </label>
+        <label className="champ" style={{ flex: '1 1 160px' }}>
+          Commune
+          <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Rezé" />
+        </label>
+        <div className="champ" style={{ flex: '1 1 200px' }}>
+          Type
+          <div className="seg">
+            <button type="button" className={kind === 'ville' ? 'actif' : ''} onClick={() => setKind('ville')}>
+              Commune
+            </button>
+            <button type="button" className={kind === 'circo' ? 'actif' : ''} onClick={() => setKind('circo')}>
+              Circo
+            </button>
+          </div>
         </div>
-        <div className="row" style={{ marginTop: 10 }}>
-          <button
-            className="btn primary"
-            onClick={() => start(async () => { await updateItinerary(itinerary.id, name, city); })}
-          >
-            Enregistrer
-          </button>
-          <button
-            className="btn danger"
-            onClick={() => {
-              if (confirm('Supprimer cet itinéraire et tous ses panneaux ?'))
-                start(async () => {
-                  await deleteItinerary(itinerary.id);
-                  router.push('/admin');
-                });
-            }}
-          >
-            Supprimer
-          </button>
-        </div>
+        <button
+          className={'btn ' + (modifie ? 'btn-violet' : '')}
+          disabled={!modifie}
+          onClick={() => start(async () => { await updateItinerary(itinerary.id, name, city, kind); })}
+        >
+          {modifie ? 'Enregistrer' : 'Enregistré ✓'}
+        </button>
+        <button className="btn-texte-danger" onClick={() => setSupprTournee(true)}>
+          Supprimer
+        </button>
       </div>
 
-      <div className="row" style={{ margin: '4px 0' }}>
-        <span className={'badge' + (full ? ' warn' : '')}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', margin: '18px 0 8px' }}>
+        <span className={'badge' + (full ? ' alerte' : '')}>
           {panels.length} / {MAX_PANELS} panneaux
         </span>
-        {notice && <span className="err" style={{ margin: 0 }}>{notice}</span>}
+        <span style={{ fontSize: 13, color: 'var(--gris)' }}>
+          {full
+            ? `Limite de ${MAX_PANELS} atteinte (limite Google Maps). Retire un panneau pour en ajouter un autre.`
+            : 'Clique sur la carte pour ajouter un panneau, glisse un marqueur pour le déplacer.'}
+        </span>
+        {notice && <span className="erreur">{notice}</span>}
       </div>
-      <p className="muted" style={{ fontSize: '.85rem' }}>
-        {full ? (
-          <>Limite de {MAX_PANELS} panneaux atteinte (limite Google Maps). Supprime-en un pour en ajouter un autre.</>
-        ) : (
-          <>
-            Clique sur la carte pour <b>ajouter</b> un panneau · glisse un marqueur pour le{' '}
-            <b>déplacer</b>. L&apos;ordre des panneaux ci-dessous = l&apos;ordre de la tournée.
-          </>
-        )}
-      </p>
 
-      <div className="editor">
-        <div id="map" ref={mapEl} />
-        <div>
+      <div className="editeur">
+        <div className="editeur-carte" ref={mapEl} />
+        <div className="editeur-liste">
           {panels.length === 0 && (
-            <p className="muted">Aucun panneau. Clique sur la carte pour en ajouter.</p>
+            <p style={{ color: 'var(--gris)', fontSize: 14 }}>
+              Aucun panneau. Clique sur la carte pour en ajouter.
+            </p>
           )}
           {panels.map((p, i) => (
-            <div className="panel-row" key={p.id}>
-              <span className="idx">{i + 1}</span>
+            <div className="panneau-ligne" key={p.id}>
+              <span className="ligne-num">{i + 1}</span>
               <input
-                type="text"
                 value={p.name}
                 onChange={(e) => onNameChange(p.id, e.target.value)}
                 onBlur={() => saveName(p.id)}
                 aria-label={`Nom du panneau ${i + 1}`}
               />
-              <button className="btn sm" disabled={i === 0} onClick={() => onReorder(p.id, 'up')} title="Monter">
+              <button className="btn btn-carre" disabled={i === 0} onClick={() => onReorder(p.id, 'up')} title="Monter">
                 ↑
               </button>
               <button
-                className="btn sm"
+                className="btn btn-carre"
                 disabled={i === panels.length - 1}
                 onClick={() => onReorder(p.id, 'down')}
                 title="Descendre"
               >
                 ↓
               </button>
-              <button
-                className="btn sm danger"
-                onClick={() => {
-                  if (confirm(`Supprimer le panneau « ${p.name} » ?`)) onDelete(p.id);
-                }}
-              >
+              <button className="btn btn-carre btn-texte-danger" onClick={() => setARetirer(p)} title="Retirer">
                 ✕
               </button>
             </div>
           ))}
         </div>
       </div>
-    </>
+
+      {aRetirer && (
+        <Confirm
+          titre="Retirer le panneau"
+          action="Retirer"
+          texte={`« ${aRetirer.name} » sera retiré de cette tournée. S'il ne sert dans aucune autre tournée, le panneau sera supprimé du catalogue.`}
+          onAnnuler={() => setARetirer(null)}
+          onConfirmer={() => {
+            const id = aRetirer.id;
+            setARetirer(null);
+            onDelete(id);
+          }}
+        />
+      )}
+
+      {supprTournee && (
+        <Confirm
+          titre="Supprimer la tournée"
+          texte={`« ${itinerary.name} » sera supprimée. Ses panneaux sont conservés dans le catalogue et dans les autres tournées où ils servent.`}
+          onAnnuler={() => setSupprTournee(false)}
+          onConfirmer={() => {
+            setSupprTournee(false);
+            start(async () => {
+              await deleteItinerary(itinerary.id);
+              router.push('/admin');
+            });
+          }}
+        />
+      )}
+    </div>
   );
 }

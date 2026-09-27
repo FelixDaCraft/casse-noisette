@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import ResetForm from './ResetForm';
+import AuthShell from '../AuthShell';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,21 +12,18 @@ export default async function ResetPage({
   const { token } = await searchParams;
   if (!token) {
     return (
-      <div className="login-wrap">
-        <div className="login-card">
-          <p className="err">Lien invalide.</p>
-          <p>
-            <Link href="/admin/forgot" className="muted">
-              Demander un nouveau lien
-            </Link>
-          </p>
-        </div>
-      </div>
+      <AuthShell>
+        <h2>Lien invalide</h2>
+        <p className="sous">Ce lien a expiré ou a déjà servi.</p>
+        <Link href="/admin/forgot" className="lien-sobre">
+          Demander un nouveau lien
+        </Link>
+      </AuthShell>
     );
   }
   return (
-    <div className="login-wrap">
+    <AuthShell>
       <ResetForm token={token} />
-    </div>
+    </AuthShell>
   );
 }

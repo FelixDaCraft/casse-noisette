@@ -102,21 +102,34 @@ export async function performReset(
 
 /* ---------------- Itinéraires ---------------- */
 
-export async function createItinerary(formData: FormData) {
+/** Renvoie l'id de la tournée créée, pour ouvrir l'éditeur dans la foulée. */
+export async function createItinerary(formData: FormData): Promise<string | undefined> {
   await requireAdmin();
   const name = String(formData.get('name') || '').trim();
   if (!name) return;
   const city = String(formData.get('city') || '').trim() || null;
+  const kind = formData.get('kind') === 'circo' ? 'circo' : 'ville';
   const max = await prisma.itinerary.aggregate({ _max: { position: true } });
-  await prisma.itinerary.create({ data: { name, city, position: (max._max.position ?? -1) + 1 } });
+  const it = await prisma.itinerary.create({
+    data: { name, city, kind, position: (max._max.position ?? -1) + 1 },
+  });
   revalAll();
+  return it.id;
 }
 
-export async function updateItinerary(id: string, name: string, city: string) {
+export async function updateItinerary(
+  id: string,
+  name: string,
+  city: string,
+  kind?: 'circo' | 'ville',
+) {
   await requireAdmin();
   const n = name.trim();
   if (!n) return;
-  await prisma.itinerary.update({ where: { id }, data: { name: n, city: city.trim() || null } });
+  await prisma.itinerary.update({
+    where: { id },
+    data: { name: n, city: city.trim() || null, ...(kind ? { kind } : {}) },
+  });
   revalAll(id);
 }
 

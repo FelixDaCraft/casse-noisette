@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getCurrentAdmin } from '@/lib/auth';
 import LoginForm from './LoginForm';
+import AuthShell from '../AuthShell';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,8 +13,8 @@ export default async function LoginPage({
   if (await getCurrentAdmin()) redirect('/admin');
   const { reset } = await searchParams;
   return (
-    <div className="login-wrap">
+    <AuthShell>
       <LoginForm resetDone={reset === '1'} />
-    </div>
+    </AuthShell>
   );
 }

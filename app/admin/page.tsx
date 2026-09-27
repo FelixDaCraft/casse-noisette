@@ -1,27 +1,31 @@
 import { requireAdmin } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { createItinerary } from './actions';
 import ItineraryAdminList from './ItineraryAdminList';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminHome() {
   await requireAdmin();
-  const itineraries = await prisma.itinerary.findMany({
-    orderBy: [{ kind: 'asc' }, { city: 'asc' }, { position: 'asc' }],
-    include: { _count: { select: { stops: true } } },
-  });
+  const [itineraries, panneaux] = await Promise.all([
+    prisma.itinerary.findMany({
+      orderBy: [{ kind: 'asc' }, { city: 'asc' }, { position: 'asc' }],
+      include: { _count: { select: { stops: true } } },
+    }),
+    prisma.panel.count(),
+  ]);
+
   return (
-    <>
-      <h1>Itinéraires</h1>
-      <form action={createItinerary} className="panel row">
-        <input className="grow" type="text" name="name" placeholder="Nom du nouvel itinéraire" required />
-        <input type="text" name="city" placeholder="Ville" style={{ maxWidth: 180 }} />
-        <button className="btn primary">+ Ajouter</button>
-      </form>
+    <div className="admin-large">
       <ItineraryAdminList
-        items={itineraries.map((i) => ({ id: i.id, name: i.name, city: i.city, kind: i.kind, count: i._count.stops }))}
+        total={{ tournees: itineraries.length, panneaux }}
+        items={itineraries.map((i) => ({
+          id: i.id,
+          name: i.name,
+          city: i.city,
+          kind: i.kind,
+          count: i._count.stops,
+        }))}
       />
-    </>
+    </div>
   );
 }
