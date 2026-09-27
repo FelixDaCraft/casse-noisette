@@ -45,6 +45,17 @@ Dès qu'une de ces variables est définie, l'app bascule automatiquement en mode
 rapide : plus d'étranglement des requêtes, plus d'affinage différé, le calcul
 est attendu et renvoyé directement.
 
+## Tester depuis le poste de dev
+
+Les ports n'écoutent que sur la boucle locale du homelab. Pour les atteindre
+depuis le poste, ouvrir un tunnel SSH le temps du test :
+
+```bash
+ssh -N -L 5100:127.0.0.1:5100 -L 5101:127.0.0.1:5101 -L 5102:127.0.0.1:5102 root@192.168.1.122
+```
+
+puis renseigner `OSRM_URL_*` sur `http://127.0.0.1:510x` dans le `.env` local.
+
 ## Mise à jour de la carte
 
 Une à deux fois par an suffit pour des panneaux d'affichage :
