@@ -75,6 +75,12 @@ export function useOptimizedOrder(itineraries: Input[], mode: Mode): Optimizatio
     [itineraries],
   );
   const payloadKey = useMemo(() => JSON.stringify(payload), [payload]);
+  // L'effet ne doit dépendre QUE de cette empreinte, jamais du tableau lui-même :
+  // l'appelant peut très bien reconstruire la liste à chaque rendu (c'est le cas
+  // quand elle est filtrée par onglet), et une dépendance sur la référence
+  // relancerait le calcul en boucle.
+  const payloadRef = useRef(payload);
+  payloadRef.current = payload;
 
   const retry = useCallback(() => {
     refines.current = 0;
@@ -133,7 +139,8 @@ export function useOptimizedOrder(itineraries: Input[], mode: Mode): Optimizatio
 
   // 2) Calcul de l'ordre, relancé quand la position ou le mode change.
   useEffect(() => {
-    if (!pos || payload.length === 0) return;
+    const courant = payloadRef.current;
+    if (!pos || courant.length === 0) return;
     abort.current?.abort();
     const ctrl = new AbortController();
     abort.current = ctrl;
@@ -142,7 +149,7 @@ export function useOptimizedOrder(itineraries: Input[], mode: Mode): Optimizatio
     fetch('/api/optimize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ origin: pos, mode, itineraries: payload }),
+      body: JSON.stringify({ origin: pos, mode, itineraries: courant }),
       signal: ctrl.signal,
     })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
@@ -150,7 +157,7 @@ export function useOptimizedOrder(itineraries: Input[], mode: Mode): Optimizatio
         const next: Record<string, number[]> = {};
         let degraded = false;
         for (const r of data.results ?? []) {
-          const it = payload.find((p) => p.id === r.id);
+          const it = courant.find((p) => p.id === r.id);
           if (!it || !isPermutation(r.order, it.panels.length)) continue;
           next[r.id] = r.order;
           if (r.source !== 'osrm') degraded = true;
@@ -175,7 +182,7 @@ export function useOptimizedOrder(itineraries: Input[], mode: Mode): Optimizatio
       });
 
     return () => ctrl.abort();
-  }, [pos, mode, payloadKey, payload, refresh]);
+  }, [pos, mode, payloadKey, refresh]);
 
   // Changer de mode relance un cycle d'affinage complet.
   useEffect(() => {

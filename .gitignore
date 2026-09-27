@@ -17,3 +17,6 @@ tsconfig.tsbuildinfo
 # divers
 .DS_Store
 *.log
+
+# builds de verification (voir distDir dans next.config.mjs)
+/.next-*/

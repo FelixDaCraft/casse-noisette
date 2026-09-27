@@ -1,5 +1,5 @@
 'use client';
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { gmapsUrl, telegramUrl, cleanName, isAutoName, type Mode } from '@/lib/maps';
 import { useOptimizedOrder, type Status } from './useOptimizedOrder';
 
@@ -85,7 +85,7 @@ export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
   const [vue, setVue] = useState<Kind>(
     itineraries.some((it) => it.kind === 'ville') ? 'ville' : 'circo',
   );
-  const visibles = itineraries.filter((it) => it.kind === vue);
+  const visibles = useMemo(() => itineraries.filter((it) => it.kind === vue), [itineraries, vue]);
   const total = visibles.reduce((s, it) => s + it.panels.length, 0);
   const compte = (k: Kind) => itineraries.filter((it) => it.kind === k).length;
   const { status, orders, approx, refining, retry } = useOptimizedOrder(visibles, mode);

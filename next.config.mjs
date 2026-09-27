@@ -1,6 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  // Permet de vérifier un build sans écraser le .next d'un `next dev` en cours
+  // (ce qui casse le serveur de dev en pleine session) :
+  //   NEXT_DIST_DIR=.next-verif npm run build
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   reactStrictMode: true,
   poweredByHeader: false,
   eslint: { ignoreDuringBuilds: true },
