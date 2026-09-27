@@ -333,7 +333,9 @@ function Carte({
           <span className="tournee-txt">
             <span className="tournee-titre">{titre}</span>
             <span className="tournee-meta">
-              <span>{panels.length} panneaux</span>
+              <span>
+              {panels.length} panneau{panels.length > 1 ? 'x' : ''}
+            </span>
               {mesure && <span>{km(mesure.meters)}</span>}
               {mesure?.seconds != null && <span>{duree(mesure.seconds)}</span>}
             </span>

@@ -351,6 +351,9 @@ button {
   display: flex;
   align-items: stretch;
   gap: 10px;
+  /* C'est le bouton GPS, carré, qui donne la hauteur : la carte s'y aligne.
+     La liste reste ainsi régulière quelle que soit la longueur des titres. */
+  height: 60px;
 }
 .tournee {
   flex: 1;
@@ -372,8 +375,8 @@ button {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px 12px 14px 14px;
+  gap: 10px;
+  padding: 8px 10px 8px 8px;
   border: 0;
   background: transparent;
   text-align: left;
@@ -391,7 +394,7 @@ button {
   flex: none;
   width: 40px;
   height: 40px;
-  border-radius: var(--r-champ);
+  border-radius: var(--r-petit);
   background: var(--violet);
   color: var(--creme);
   display: grid;
@@ -404,39 +407,46 @@ button {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 2px;
 }
 .tournee-titre {
   font-weight: 800;
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1.25;
-  text-wrap: pretty;
+  /* Une seule ligne : la hauteur est celle du bouton, le titre complet reste
+     visible dans le détail. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .tournee-meta {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 6px 10px;
-  font-size: 13px;
+  gap: 8px;
+  font-size: 12px;
   color: var(--gris);
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
 }
 .tournee-chev {
   flex: none;
 }
 .tournee-gps {
   flex: none;
-  width: 64px;
+  /* Carré : le côté suit la hauteur de la ligne. */
+  aspect-ratio: 1;
+  height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  border-radius: var(--r-carte);
+  gap: 2px;
+  border-radius: var(--r-petit);
   background: var(--rouge);
   color: #fff;
   text-decoration: none;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -453,8 +463,8 @@ button {
   transform: scale(0.97);
 }
 .tournee-gps svg {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
 }
 
 .pied {
