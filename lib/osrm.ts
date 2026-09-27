@@ -4,13 +4,18 @@
 // vol d'oiseau, il tient compte de la Loire, des voies ferrées, des sens uniques
 // et des rues piétonnes.
 //
-// Les serveurs publics FOSSGIS sont offerts pour un usage léger et refusent
-// (429) ou ignorent les appels trop rapprochés. On s'y plie strictement :
-//   - une seule requête à la fois, espacée d'au moins MIN_GAP_MS ;
-//   - une seule nouvelle tentative en cas de 429 / timeout ;
-//   - disjoncteur : après plusieurs échecs d'affilée on cesse d'appeler
-//     pendant quelques minutes (l'appelant retombe sur le vol d'oiseau).
-// Pour un service fiable, pointer OSRM_BASE_URL vers sa propre instance.
+// Deux configurations possibles :
+//
+//  1. INSTANCE DÉDIÉE (recommandé, voir deploy/osrm/) — une URL par profil via
+//     OSRM_URL_WALKING / OSRM_URL_BICYCLING / OSRM_URL_DRIVING. Réponses en
+//     quelques dizaines de millisecondes : pas d'étranglement, pas d'attente,
+//     l'ordre exact est calculé avant même l'affichage de la page.
+//
+//  2. INSTANCE PUBLIQUE FOSSGIS (repli par défaut, sans configuration) — offerte
+//     pour un usage léger : elle refuse (429) ou fait patienter ~8 s les appels
+//     rapprochés. On s'y plie strictement : une requête à la fois espacée de
+//     MIN_GAP_MS, une seule nouvelle tentative, et un disjoncteur qui suspend
+//     les appels après plusieurs échecs (l'appelant retombe sur le vol d'oiseau).
 
 import type { Mode } from './maps';
 
@@ -20,11 +25,21 @@ const PROFILE: Record<Mode, string> = {
   driving: 'routed-car',
 };
 
+/** Instance dédiée : une URL par mode, chacune servant son propre profil. */
+const DEDICATED: Record<Mode, string | undefined> = {
+  walking: process.env.OSRM_URL_WALKING,
+  bicycling: process.env.OSRM_URL_BICYCLING,
+  driving: process.env.OSRM_URL_DRIVING,
+};
+/** Vrai dès qu'au moins une instance dédiée est configurée : on peut aller vite. */
+export const OSRM_DEDICATED = Object.values(DEDICATED).some(Boolean);
+
 const BASE = (process.env.OSRM_BASE_URL || 'https://routing.openstreetmap.de').replace(/\/+$/, '');
 // L'instance publique ne bloque pas : elle FAIT PATIENTER (~8-9 s dès la deuxième
-// requête). Un timeout court ferait échouer des appels qui auraient abouti.
-const TIMEOUT_MS = Number(process.env.OSRM_TIMEOUT_MS || 15000);
-const MIN_GAP_MS = Number(process.env.OSRM_MIN_GAP_MS || 1200);
+// requête), d'où un timeout long et un espacement strict. Une instance dédiée
+// n'a besoin ni de l'un ni de l'autre.
+const TIMEOUT_MS = Number(process.env.OSRM_TIMEOUT_MS || (OSRM_DEDICATED ? 5000 : 15000));
+const MIN_GAP_MS = Number(process.env.OSRM_MIN_GAP_MS || (OSRM_DEDICATED ? 0 : 1200));
 const BREAKER_FAILS = 3;
 const BREAKER_MS = 3 * 60 * 1000;
 // L'instance FOSSGIS ignore les User-Agent génériques : on s'identifie comme le veut sa politique.
@@ -47,6 +62,7 @@ export function osrmPaused(): boolean {
 
 /** File d'attente : garantit un seul appel à la fois, espacé de MIN_GAP_MS. */
 function serialize<T>(fn: () => Promise<T>): Promise<T> {
+  if (MIN_GAP_MS <= 0) return fn(); // instance dédiée : pas de file d'attente
   const run = state.chain.then(async () => {
     const wait = state.last + MIN_GAP_MS - Date.now();
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
@@ -77,9 +93,13 @@ export async function osrmTable(
   if (opts.sources) qs.set('sources', opts.sources.join(';'));
   if (opts.destinations) qs.set('destinations', opts.destinations.join(';'));
 
-  // Le segment de profil dans le chemin est ignoré par FOSSGIS : c'est le
-  // préfixe `routed-*` qui choisit le mode de déplacement.
-  const url = `${BASE}/${PROFILE[mode]}/table/v1/driving/${path}?${qs}`;
+  // Instance dédiée : chaque URL sert déjà son profil. Sinon, chez FOSSGIS,
+  // c'est le préfixe `routed-*` qui choisit le mode (le segment de profil dans
+  // le chemin, lui, est ignoré dans les deux cas).
+  const host = DEDICATED[mode];
+  const url = host
+    ? `${host.replace(/\/+$/, '')}/table/v1/driving/${path}?${qs}`
+    : `${BASE}/${PROFILE[mode]}/table/v1/driving/${path}?${qs}`;
 
   for (let attempt = 0; attempt < 2; attempt++) {
     const out = await serialize(() => call(url));

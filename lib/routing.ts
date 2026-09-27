@@ -13,7 +13,7 @@
 
 import { createHash } from 'node:crypto';
 import { haversine, haversineMatrix, type Coord } from './geo';
-import { osrmTable, osrmPaused } from './osrm';
+import { osrmTable, osrmPaused, OSRM_DEDICATED } from './osrm';
 import { solveOpenPath } from './tsp';
 import type { Mode } from './maps';
 
@@ -31,9 +31,11 @@ const MATRIX_TTL_MS = 6 * 60 * 60 * 1000; // matrices inter-panneaux : quasi sta
 const ORIGIN_TTL_MS = 10 * 60 * 1000; // lignes depuis une position : le militant bouge
 const MAX_ENTRIES = 500;
 const DEST_CHUNK = 90; // OSRM public limite le nombre de coordonnées par requête
-// Au-delà de ce délai on répond au vol d'oiseau : la page ne doit pas attendre
-// un serveur de routage lent. Le calcul se poursuit et remplit le cache.
-const ORIGIN_BUDGET_MS = Number(process.env.OPTIMIZE_BUDGET_MS || 2500);
+// Temps que la requête accepte d'attendre le routage. Une instance dédiée
+// répond en quelques dizaines de millisecondes : tout arrive dans le budget et
+// l'ordre exact est prêt dès le premier affichage. Avec l'instance publique, on
+// répond au vol d'oiseau à l'échéance et le calcul se poursuit en fond.
+const BUDGET_MS = Number(process.env.OPTIMIZE_BUDGET_MS || (OSRM_DEDICATED ? 4000 : 2500));
 
 type Entry<T> = { value: T; expires: number };
 // `globalThis` : survit au rechargement à chaud en développement (même patron que lib/db.ts).
@@ -85,12 +87,12 @@ const MAX_COORDS = 95;
  * Sur un serveur public qui fait patienter plusieurs secondes par appel, c'est
  * la différence entre une poignée de secondes et plusieurs minutes.
  */
-function warmMatrices(missing: { key: string; panels: Coord[] }[], mode: Mode): void {
+function warmMatrices(missing: { key: string; panels: Coord[] }[], mode: Mode): Promise<void> {
   const todo = missing.filter((m) => !warming.has(m.key));
-  if (!todo.length || osrmPaused()) return;
+  if (!todo.length || osrmPaused()) return Promise.resolve();
   for (const m of todo) warming.add(m.key);
 
-  void (async () => {
+  return (async () => {
     try {
       for (let i = 0; i < todo.length; ) {
         // Un paquet d'itinéraires entiers, sous la limite de coordonnées.
@@ -163,7 +165,7 @@ export async function optimizeItineraries(
       pending = true;
     }
   }
-  const warmMissing = () => warmMatrices(missing, mode);
+
 
   // 2) Ligne « position → panneaux », en une requête groupée pour toute la page.
   const oKey = originKey(origin);
@@ -177,43 +179,43 @@ export async function optimizeItineraries(
     else toFetch.push({ key, panels: itineraries[i].panels });
   }
 
-  if (toFetch.length) {
-    const flat: Coord[] = [];
-    const spans: { key: string; start: number; len: number }[] = [];
-    for (const t of toFetch) {
-      spans.push({ key: t.key, start: flat.length, len: t.panels.length });
-      flat.push(...t.panels);
-    }
-
-    // Lancée AVANT les préchauffages : elle passe en tête de la file d'appels,
-    // car c'est la seule dont l'utilisateur a besoin tout de suite.
-    const job = fetchOriginLine(origin, flat, mode).then((line) => {
-      for (const s of spans) {
-        const part = line.slice(s.start, s.start + s.len);
-        if (part.length === s.len && part.every((d) => Number.isFinite(d))) {
-          cacheSet(`o:${oKey}:${s.key}`, part as number[], ORIGIN_TTL_MS);
+  // Les deux familles de requêtes partent ensemble, la ligne d'origine en tête
+  // (c'est la seule dont dépend le choix du premier panneau).
+  // Le résultat est mis en cache DANS le job : même si le budget expire avant,
+  // le travail n'est pas perdu et la requête suivante en profite.
+  const originJob = toFetch.length
+    ? fetchOriginLine(origin, toFetch.flatMap((t) => t.panels), mode).then((l) => {
+        let off = 0;
+        for (const t of toFetch) {
+          const part = l.slice(off, off + t.panels.length);
+          if (part.length === t.panels.length && part.every((d) => Number.isFinite(d))) {
+            cacheSet(`o:${oKey}:${t.key}`, part, ORIGIN_TTL_MS);
+          }
+          off += t.panels.length;
         }
-      }
-      return line;
-    });
+        return l;
+      })
+    : null;
+  const matrixJob = warmMatrices(missing, mode);
 
-    warmMissing();
+  // On attend, mais pas plus que le budget : passé ce délai on répond avec ce
+  // qu'on a, et les calculs en cours continuent de remplir le cache.
+  await Promise.race([
+    Promise.all([originJob?.catch(() => null), matrixJob.catch(() => undefined)]),
+    new Promise((r) => setTimeout(r, BUDGET_MS)),
+  ]);
 
-    // On n'attend qu'un temps borné ; au-delà, `job` continue et remplira le cache
-    // pour la requête d'affinage suivante.
-    const line = await Promise.race([
-      job.catch(() => null),
-      new Promise<null>((r) => setTimeout(() => r(null), ORIGIN_BUDGET_MS)),
-    ]);
+  // Les matrices arrivées entre-temps sont maintenant dans le cache.
+  for (const m of missing) {
+    const fresh = cacheGet<number[][]>(`m:${m.key}`);
+    if (fresh) matrices.set(m.key, fresh);
+  }
+  if (missing.every((m) => matrices.get(m.key))) pending = false;
 
-    for (const s of spans) {
-      const part = line ? line.slice(s.start, s.start + s.len) : [];
-      const ok = part.length === s.len && part.every((d) => Number.isFinite(d));
-      if (!ok && !osrmPaused()) pending = true; // ça vaut le coup de redemander
-      fromOrigin.set(s.key, ok ? (part as number[]) : null);
-    }
-  } else {
-    warmMissing();
+  for (const t of toFetch) {
+    const part = cacheGet<number[]>(`o:${oKey}:${t.key}`) ?? null;
+    if (!part && !osrmPaused()) pending = true; // ça vaut le coup de redemander
+    fromOrigin.set(t.key, part);
   }
 
   // 3) Assemblage de la matrice de coûts et résolution, itinéraire par itinéraire.

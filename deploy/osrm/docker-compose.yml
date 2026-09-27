@@ -1,0 +1,61 @@
+# OSRM auto-hébergé — moteur de calcul d'itinéraires pour Casse-Noisette.
+#
+# Trois instances, une par mode de déplacement : OSRM ne sert qu'un profil à la
+# fois. Chacune répond en quelques dizaines de millisecondes sur le LAN, ce qui
+# rend le réordonnancement des panneaux instantané côté page publique.
+#
+# Les données sont préparées une fois par ./prepare.sh (voir README.md), puis
+# ces conteneurs se contentent de les servir.
+#
+# Ports : 5100-5102, publiés sur 127.0.0.1 uniquement — l'app Next.js y accède
+# depuis le même hôte. Rien n'est exposé sur Internet (aucune règle d'ingress
+# Cloudflare à ajouter).
+
+services:
+  osrm-car:
+    image: ghcr.io/project-osrm/osrm-backend:latest
+    container_name: osrm-car
+    restart: unless-stopped
+    command: osrm-routed --algorithm mld --max-table-size 200 /data/car/region.osrm
+    volumes:
+      - ./data:/data:ro
+    ports:
+      - '127.0.0.1:5100:5000'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:5000/table/v1/driving/-1.547,47.19;-1.546,47.186 | grep -q "\"code\":\"Ok\"" || exit 1']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  osrm-bike:
+    image: ghcr.io/project-osrm/osrm-backend:latest
+    container_name: osrm-bike
+    restart: unless-stopped
+    command: osrm-routed --algorithm mld --max-table-size 200 /data/bike/region.osrm
+    volumes:
+      - ./data:/data:ro
+    ports:
+      - '127.0.0.1:5101:5000'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:5000/table/v1/driving/-1.547,47.19;-1.546,47.186 | grep -q "\"code\":\"Ok\"" || exit 1']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  osrm-foot:
+    image: ghcr.io/project-osrm/osrm-backend:latest
+    container_name: osrm-foot
+    restart: unless-stopped
+    command: osrm-routed --algorithm mld --max-table-size 200 /data/foot/region.osrm
+    volumes:
+      - ./data:/data:ro
+    ports:
+      - '127.0.0.1:5102:5000'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:5000/table/v1/driving/-1.547,47.19;-1.546,47.186 | grep -q "\"code\":\"Ok\"" || exit 1']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

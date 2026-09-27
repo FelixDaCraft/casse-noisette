@@ -162,11 +162,29 @@ casse-noisette/
 cp .env.example .env        # renseigner DATABASE_URL, SESSION_SECRET, SEED_ADMIN_*
 npm install
 npm run db:push             # crée les tables (sans fichiers de migration)
-npm run db:seed             # admin initial + import des 9 itinéraires
+npm run db:seed             # admin initial + import des itinéraires
 npm run dev                 # → http://localhost:3000
 ```
 
 > Nécessite un PostgreSQL accessible via `DATABASE_URL`.
+
+### Tester sur les vraies données
+
+`scripts/dev-db.sh` monte un Postgres local chargé avec une **copie** des données
+de production, pour travailler sur les vrais itinéraires sans jamais toucher à
+la prod :
+
+```bash
+# dump de la prod (lecture seule), à refaire quand on veut rafraîchir la copie
+ssh root@192.168.1.122 'docker exec casse-noisette-db pg_dump -U casse -d casse_noisette' \
+  > ../casse-noisette-dev-data/prod-dump.sql
+
+sudo ./scripts/dev-db.sh     # Postgres jetable sur 127.0.0.1:5435
+npm run dev
+```
+
+`sudo` n'est requis que parce que le compte n'est pas dans le groupe `docker`.
+`sudo ./scripts/dev-db.sh reset` recharge le dump à neuf, `stop` arrête la base.
 
 ---
 
@@ -181,9 +199,9 @@ npm run dev                 # → http://localhost:3000
 | `NEXT_PUBLIC_SITE_URL` | URL publique (liens dans les emails) |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` | SMTP (Resend) — optionnel |
 | `MAIL_FROM` | Expéditeur des emails de reset |
-| `OSRM_BASE_URL` | Serveur de routage pour l'ordre de passage (défaut : instance publique FOSSGIS) |
-| `OSRM_TIMEOUT_MS` / `OSRM_MIN_GAP_MS` | Délai max et espacement des requêtes de routage |
-| `OPTIMIZE_BUDGET_MS` | Attente max du routage avant de répondre au vol d'oiseau |
+| `OSRM_URL_DRIVING` / `OSRM_URL_BICYCLING` / `OSRM_URL_WALKING` | Instance OSRM auto-hébergée, une URL par mode (voir `deploy/osrm/`) — active le mode instantané |
+| `OSRM_BASE_URL` | Serveur de routage de repli (défaut : instance publique FOSSGIS) |
+| `OSRM_TIMEOUT_MS` / `OSRM_MIN_GAP_MS` / `OPTIMIZE_BUDGET_MS` | Réglages fins du routage (valeurs par défaut adaptées automatiquement) |
 
 > 🔒 Le `.env` n'est **jamais** committé. En prod il vit dans `/opt/casse-noisette-app/.env`.
 
@@ -207,7 +225,9 @@ POST /api/optimize  { origin, mode, itineraries }
         │                                pour TOUS les itinéraires d'un coup)
         ├─ ligne « ma position → panneaux » ──► OSRM (cache 10 min par zone
         │                                de ~110 m, une seule requête)
-        │      ⏱ au-delà de OPTIMIZE_BUDGET_MS on n'attend plus
+        │      ⏱ au-delà de OPTIMIZE_BUDGET_MS on n'attend plus (le calcul
+        │         continue en fond ; avec une instance dédiée, tout tient
+        │         largement dans le budget et rien n'est différé)
         │
         ▼
 Held-Karp (optimum exact, ≤ 12 arrêts) ──► ordre des panneaux
@@ -229,11 +249,17 @@ lien Google Maps construit dans cet ordre
   son titre recalculé sur ses extrémités réelles une fois réordonné ; un nom
   saisi à la main est laissé intact.
 
-> ⚠️ **L'instance publique FOSSGIS fait patienter ~8 s par requête** dès la
-> deuxième (mesuré). Le cache et le regroupement ramènent ça à **2 requêtes pour
-> toute la page**, mais pour un service rapide il faut héberger sa propre
-> instance OSRM et renseigner `OSRM_BASE_URL`. Sans routage disponible, tout
-> continue de fonctionner au vol d'oiseau.
+### Deux vitesses selon le moteur de routage
+
+| | Instance dédiée (`deploy/osrm/`) | Instance publique FOSSGIS (défaut) |
+|---|---|---|
+| Temps de réponse | ~20 ms | ~8,5 s dès la 2ᵉ requête (mesuré) |
+| Ce que voit le militant | l'ordre exact **dès l'affichage** | ordre au vol d'oiseau, puis affinage ~10 s après |
+| Requêtes par page | 2, sans file d'attente | 2, sérialisées et espacées |
+| Mise en place | `deploy/osrm/README.md` | aucune |
+
+L'application bascule toute seule dès qu'une variable `OSRM_URL_*` est définie.
+Sans aucun routage disponible, tout continue de fonctionner au vol d'oiseau.
 
 ---
 
