@@ -36,6 +36,11 @@ services:
       db:
         condition: service_healthy
     environment:
+      # Routage pour l'ordre de passage des panneaux (voir deploy/osrm/).
+      # Vide = repli sur l'instance publique FOSSGIS, plus lente.
+      OSRM_URL_DRIVING: ${OSRM_URL_DRIVING:-}
+      OSRM_URL_BICYCLING: ${OSRM_URL_BICYCLING:-}
+      OSRM_URL_WALKING: ${OSRM_URL_WALKING:-}
       DATABASE_URL: postgresql://${POSTGRES_USER:-casse}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requis}@db:5432/${POSTGRES_DB:-casse_noisette}?schema=public
       SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET requis (openssl rand -hex 32)}
       NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://casse-noisette.aynn.fr}
@@ -57,6 +62,7 @@ services:
       start_period: 60s
     networks:
       - internal
+      - osrm-net
 
 volumes:
   pgdata:
@@ -65,3 +71,7 @@ volumes:
 networks:
   internal:
     driver: bridge
+  # Reseau partage avec les services OSRM (deploy/osrm/). A creer une fois :
+  #   docker network create osrm-net
+  osrm-net:
+    external: true

@@ -7,9 +7,16 @@
 # Les données sont préparées une fois par ./prepare.sh (voir README.md), puis
 # ces conteneurs se contentent de les servir.
 #
-# Ports : 5100-5102, publiés sur 127.0.0.1 uniquement — l'app Next.js y accède
-# depuis le même hôte. Rien n'est exposé sur Internet (aucune règle d'ingress
-# Cloudflare à ajouter).
+# Deux voies d'accès, aucune exposée sur Internet ni sur le LAN :
+#
+#  - réseau Docker partagé `osrm-net` : c'est par là que les applications
+#    conteneurisées appellent OSRM, par nom de service (http://osrm-car:5000).
+#    Un port publié sur 127.0.0.1 ne suffirait pas : un conteneur ne peut pas
+#    joindre la loopback de l'hôte, et chaque projet a son propre réseau.
+#    À créer une fois :  docker network create osrm-net
+#
+#  - ports 5100-5102 sur 127.0.0.1 : pour l'hôte lui-même, le healthcheck et
+#    les tunnels SSH depuis un poste de dev.
 
 services:
   osrm-car:
@@ -21,8 +28,10 @@ services:
       - ./data:/data:ro
     ports:
       - '127.0.0.1:5100:5000'
+    networks: [osrm-net]
     healthcheck:
-      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:5000/table/v1/driving/-1.547,47.19;-1.546,47.186 | grep -q "\"code\":\"Ok\"" || exit 1']
+      # /dev/tcp est une fonction de bash (present dans l'image), pas de sh.
+      test: ['CMD', 'bash', '-c', 'exec 3<>/dev/tcp/127.0.0.1/5000']
       interval: 30s
       timeout: 5s
       retries: 3
@@ -37,8 +46,10 @@ services:
       - ./data:/data:ro
     ports:
       - '127.0.0.1:5101:5000'
+    networks: [osrm-net]
     healthcheck:
-      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:5000/table/v1/driving/-1.547,47.19;-1.546,47.186 | grep -q "\"code\":\"Ok\"" || exit 1']
+      # /dev/tcp est une fonction de bash (present dans l'image), pas de sh.
+      test: ['CMD', 'bash', '-c', 'exec 3<>/dev/tcp/127.0.0.1/5000']
       interval: 30s
       timeout: 5s
       retries: 3
@@ -53,9 +64,15 @@ services:
       - ./data:/data:ro
     ports:
       - '127.0.0.1:5102:5000'
+    networks: [osrm-net]
     healthcheck:
-      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:5000/table/v1/driving/-1.547,47.19;-1.546,47.186 | grep -q "\"code\":\"Ok\"" || exit 1']
+      # /dev/tcp est une fonction de bash (present dans l'image), pas de sh.
+      test: ['CMD', 'bash', '-c', 'exec 3<>/dev/tcp/127.0.0.1/5000']
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 20s
+
+networks:
+  osrm-net:
+    external: true
