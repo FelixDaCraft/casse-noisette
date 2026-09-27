@@ -180,3 +180,19 @@ input:focus{outline:none; border-color:var(--lfi)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 .geo-asking{color:#f0d9a8}
 .geo-asking .geo-ico{color:#f0d9a8; animation:pulse 1.2s ease-in-out infinite}
+
+/* Onglets de vue : tournées par commune / tournées de circonscription */
+.vues{display:flex; gap:6px; margin:22px 0 0; flex-wrap:wrap}
+.vue-btn{flex:1 1 auto; min-width:150px; border:1px solid var(--stroke); background:var(--glass);
+  backdrop-filter:blur(14px) saturate(150%); -webkit-backdrop-filter:blur(14px) saturate(150%);
+  color:var(--muted); font:600 .82rem var(--font-inter); letter-spacing:.02em;
+  padding:11px 16px; border-radius:13px; cursor:pointer; transition:.22s;
+  display:inline-flex; align-items:center; justify-content:center; gap:8px}
+.vue-btn:hover{color:var(--txt); border-color:rgba(255,255,255,.22)}
+.vue-btn.active{background:linear-gradient(135deg,var(--lfi),var(--lfi-deep)); color:#fff;
+  border-color:transparent; box-shadow:0 6px 20px rgba(229,18,59,.38)}
+.vue-cnt{font-size:.72rem; font-weight:700; padding:2px 7px; border-radius:20px;
+  background:rgba(0,0,0,.22); color:inherit; opacity:.85}
+.vue-btn.active .vue-cnt{background:rgba(255,255,255,.22)}
+.badge.kind-ville{border-color:rgba(143,214,164,.35); color:#8fd6a4; background:rgba(143,214,164,.09)}
+.badge.kind-circo{border-color:rgba(240,217,168,.35); color:#f0d9a8; background:rgba(240,217,168,.09)}

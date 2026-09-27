@@ -33,29 +33,54 @@ model PasswordReset {
   @@index([adminId])
 }
 
-/// Un itinéraire de collage (ordonné via `position`).
-model Itinerary {
-  id        String   @id @default(cuid())
-  name      String
-  city      String? // ville de rattachement (regroupement)
-  position  Int      @default(0)
-  panels    Panel[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([city, position])
+/// Type de tournée : héritée des législatives (traverse plusieurs communes),
+/// ou construite pour une seule commune.
+enum ItineraryKind {
+  circo
+  ville
 }
 
-/// Un panneau d'affichage, rattaché à un itinéraire (ordonné via `position`).
+/// Un itinéraire de collage (ordonné via `position`).
+model Itinerary {
+  id        String        @id @default(cuid())
+  name      String
+  city      String? // commune de rattachement (regroupement dans la page)
+  kind      ItineraryKind @default(circo)
+  position  Int           @default(0)
+  stops     Stop[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([kind, city, position])
+}
+
+/// Un panneau d'affichage : un lieu physique, unique, indépendant des tournées.
+/// Le même panneau peut servir dans plusieurs itinéraires (une tournée de
+/// circonscription et une tournée de commune, par exemple) sans être dupliqué :
+/// corriger sa position le corrige partout.
 model Panel {
+  id        String   @id @default(cuid())
+  name      String
+  lat       Float
+  lng       Float
+  city      String? // commune réelle du panneau (géocodage), sert au découpage
+  stops     Stop[]
+  createdAt DateTime @default(now())
+
+  @@index([city])
+}
+
+/// Passage d'un itinéraire par un panneau, à une position donnée.
+/// C'est ici que vit l'ordre de la tournée ; le panneau, lui, ne bouge pas.
+model Stop {
   id          String    @id @default(cuid())
-  name        String
-  lat         Float
-  lng         Float
-  position    Int       @default(0)
   itinerary   Itinerary @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
   itineraryId String
-  createdAt   DateTime  @default(now())
+  panel       Panel     @relation(fields: [panelId], references: [id], onDelete: Cascade)
+  panelId     String
+  position    Int       @default(0)
 
+  @@unique([itineraryId, panelId])
   @@index([itineraryId, position])
+  @@index([panelId])
 }

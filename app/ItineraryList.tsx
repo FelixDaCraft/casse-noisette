@@ -4,7 +4,13 @@ import { gmapsUrl, telegramUrl, cleanName, isAutoName, type Mode } from '@/lib/m
 import { useOptimizedOrder, type Status } from './useOptimizedOrder';
 
 type Panel = { name: string; lat: number; lng: number };
-type It = { id: string; name: string; city: string | null; panels: Panel[] };
+type Kind = 'circo' | 'ville';
+type It = { id: string; name: string; city: string | null; kind: Kind; panels: Panel[] };
+
+const VUE: { kind: Kind; label: string; aide: string }[] = [
+  { kind: 'ville', label: 'Par commune', aide: 'Tournées courtes, une seule commune à la fois' },
+  { kind: 'circo', label: '4ᵉ circonscription', aide: 'Tournées des législatives, plusieurs communes' },
+];
 
 const IconNav = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -75,14 +81,20 @@ function geoLabel(status: Status, approx: boolean, refining: boolean): string {
 
 export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
   const [mode, setMode] = useState<Mode>('driving');
-  const total = itineraries.reduce((s, it) => s + it.panels.length, 0);
-  const { status, orders, approx, refining, retry } = useOptimizedOrder(itineraries, mode);
+  // Les tournées par commune sont celles du quotidien : c'est la vue par défaut.
+  const [vue, setVue] = useState<Kind>(
+    itineraries.some((it) => it.kind === 'ville') ? 'ville' : 'circo',
+  );
+  const visibles = itineraries.filter((it) => it.kind === vue);
+  const total = visibles.reduce((s, it) => s + it.panels.length, 0);
+  const compte = (k: Kind) => itineraries.filter((it) => it.kind === k).length;
+  const { status, orders, approx, refining, retry } = useOptimizedOrder(visibles, mode);
   const canRetry = status === 'denied' || status === 'unavailable' || status === 'failed';
   // `asking` n'est pas une erreur : le navigateur attend une réponse, pas un clic de plus.
 
-  // Regroupement par ville (la liste arrive déjà triée : ville puis position).
+  // Regroupement par commune (la liste arrive déjà triée : commune puis position).
   const groups: { city: string; items: It[] }[] = [];
-  for (const it of itineraries) {
+  for (const it of visibles) {
     const c = it.city && it.city.trim() ? it.city.trim() : 'Autres';
     const last = groups[groups.length - 1];
     if (last && last.city === c) last.items.push(it);
@@ -104,11 +116,26 @@ export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
             Itinéraires de <em>collage</em>
           </h1>
           <p className="sub">
-            {itineraries.length} itinéraires · {total} panneaux · {groups.length} ville
+            {visibles.length} itinéraires · {total} panneaux · {groups.length} commune
             {groups.length > 1 ? 's' : ''}. La navigation démarre depuis ta position GPS, et
             les panneaux sont réordonnés pour que le trajet soit le plus court depuis là où tu es.
           </p>
         </header>
+
+        <div className="vues" role="tablist" aria-label="Type de tournée">
+          {VUE.filter((v) => compte(v.kind) > 0).map((v) => (
+            <button
+              key={v.kind}
+              role="tab"
+              aria-selected={vue === v.kind}
+              className={'vue-btn' + (vue === v.kind ? ' active' : '')}
+              onClick={() => setVue(v.kind)}
+              title={v.aide}
+            >
+              {v.label} <span className="vue-cnt">{compte(v.kind)}</span>
+            </button>
+          ))}
+        </div>
 
         <div className="controls">
           <div className="modes">
@@ -136,7 +163,7 @@ export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
           </p>
         </div>
 
-        {itineraries.length === 0 && <p className="muted">Aucun itinéraire pour le moment.</p>}
+        {visibles.length === 0 && <p className="muted">Aucun itinéraire pour le moment.</p>}
 
         {groups.map((g) => (
           <section key={g.city}>

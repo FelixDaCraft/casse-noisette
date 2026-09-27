@@ -139,25 +139,45 @@ export async function moveItinerary(id: string, dir: 'up' | 'down') {
   revalAll();
 }
 
-/* ---------------- Panneaux ---------------- */
+/* ---------------- Panneaux et arrêts ----------------
+   Un panneau est un lieu, partagé entre plusieurs itinéraires ; un `Stop` est
+   son passage dans une tournée donnée. Éditer un panneau (nom, position) le
+   corrige donc partout à la fois ; retirer un arrêt ne retire le panneau de
+   cette tournée-là, pas des autres. */
 
 export async function addPanel(itineraryId: string, lat: number, lng: number, name?: string) {
   await requireAdmin();
   // Limite Google Maps : 10 arrêts par itinéraire (garde côté serveur).
-  const count = await prisma.panel.count({ where: { itineraryId } });
+  const count = await prisma.stop.count({ where: { itineraryId } });
   if (count >= MAX_PANELS) return null;
-  const max = await prisma.panel.aggregate({ where: { itineraryId }, _max: { position: true } });
+
+  const itinerary = await prisma.itinerary.findUnique({ where: { id: itineraryId } });
+  const max = await prisma.stop.aggregate({ where: { itineraryId }, _max: { position: true } });
   const panel = await prisma.panel.create({
     data: {
-      itineraryId,
       name: (name || '').trim() || 'Nouveau panneau',
       lat,
       lng,
-      position: (max._max.position ?? -1) + 1,
+      city: itinerary?.city ?? null,
+      stops: { create: { itineraryId, position: (max._max.position ?? -1) + 1 } },
     },
   });
   revalAll(itineraryId);
   return { id: panel.id, name: panel.name, lat: panel.lat, lng: panel.lng };
+}
+
+/** Ajoute un panneau existant à une tournée, sans le dupliquer. */
+export async function attachPanel(itineraryId: string, panelId: string) {
+  await requireAdmin();
+  const count = await prisma.stop.count({ where: { itineraryId } });
+  if (count >= MAX_PANELS) return null;
+  if (await prisma.stop.findUnique({ where: { itineraryId_panelId: { itineraryId, panelId } } })) return null;
+  const max = await prisma.stop.aggregate({ where: { itineraryId }, _max: { position: true } });
+  await prisma.stop.create({
+    data: { itineraryId, panelId, position: (max._max.position ?? -1) + 1 },
+  });
+  revalAll(itineraryId);
+  return { ok: true };
 }
 
 export async function updatePanel(
@@ -169,32 +189,45 @@ export async function updatePanel(
   if (typeof data.name === 'string') clean.name = data.name.trim();
   if (typeof data.lat === 'number' && Number.isFinite(data.lat)) clean.lat = data.lat;
   if (typeof data.lng === 'number' && Number.isFinite(data.lng)) clean.lng = data.lng;
-  const panel = await prisma.panel.update({ where: { id }, data: clean });
-  revalAll(panel.itineraryId);
+  await prisma.panel.update({ where: { id }, data: clean });
+  // Le panneau peut servir dans plusieurs tournées : toutes sont concernées.
+  const stops = await prisma.stop.findMany({ where: { panelId: id }, select: { itineraryId: true } });
+  for (const s of stops) revalAll(s.itineraryId);
 }
 
-export async function deletePanel(id: string) {
+/**
+ * Retire le panneau de CETTE tournée. S'il n'est utilisé nulle part ailleurs,
+ * le lieu lui-même est supprimé — sinon on ne ferait qu'accumuler des panneaux
+ * orphelins invisibles.
+ */
+export async function deletePanel(id: string, itineraryId?: string) {
   await requireAdmin();
-  const panel = await prisma.panel.delete({ where: { id } });
-  revalAll(panel.itineraryId);
+  const stops = await prisma.stop.findMany({ where: { panelId: id } });
+  const cible = itineraryId ?? stops[0]?.itineraryId;
+  if (!cible) return;
+  await prisma.stop.deleteMany({ where: { panelId: id, itineraryId: cible } });
+  if (stops.length <= 1) await prisma.panel.delete({ where: { id } }).catch(() => undefined);
+  revalAll(cible);
 }
 
-export async function movePanel(id: string, dir: 'up' | 'down') {
+export async function movePanel(id: string, dir: 'up' | 'down', itineraryId?: string) {
   await requireAdmin();
-  const panel = await prisma.panel.findUnique({ where: { id } });
-  if (!panel) return;
-  const all = await prisma.panel.findMany({
-    where: { itineraryId: panel.itineraryId },
+  const stop = itineraryId
+    ? await prisma.stop.findUnique({ where: { itineraryId_panelId: { itineraryId, panelId: id } } })
+    : await prisma.stop.findFirst({ where: { panelId: id } });
+  if (!stop) return;
+  const all = await prisma.stop.findMany({
+    where: { itineraryId: stop.itineraryId },
     orderBy: { position: 'asc' },
   });
-  const i = all.findIndex((x) => x.id === id);
+  const i = all.findIndex((x) => x.id === stop.id);
   const j = dir === 'up' ? i - 1 : i + 1;
   if (j < 0 || j >= all.length) return;
   await prisma.$transaction([
-    prisma.panel.update({ where: { id: all[i].id }, data: { position: all[j].position } }),
-    prisma.panel.update({ where: { id: all[j].id }, data: { position: all[i].position } }),
+    prisma.stop.update({ where: { id: all[i].id }, data: { position: all[j].position } }),
+    prisma.stop.update({ where: { id: all[j].id }, data: { position: all[i].position } }),
   ]);
-  revalAll(panel.itineraryId);
+  revalAll(stop.itineraryId);
 }
 
 /* ---------------- Comptes admin ---------------- */

@@ -71,6 +71,11 @@ jobs:
           export SEED_ADMIN_EMAIL=$(grep '^SEED_ADMIN_EMAIL=' /opt/casse-noisette-app/.env | cut -d= -f2- | tr -d '"')
           export SEED_ADMIN_PASSWORD=$(grep '^SEED_ADMIN_PASSWORD=' /opt/casse-noisette-app/.env | cut -d= -f2- | tr -d '"')
           echo "::add-mask::$SEED_ADMIN_PASSWORD"
+          # Migration de structure AVANT db push : `db push` seul supprimerait
+          # Panel.itineraryId après avoir créé une table Stop vide, donc perdrait
+          # le rattachement des panneaux aux itinéraires. Le script est
+          # idempotent : sans rien à faire, il sort immédiatement.
+          node prisma/migrate-stops.mjs
           npx prisma db push --skip-generate
           node prisma/seed.mjs
 

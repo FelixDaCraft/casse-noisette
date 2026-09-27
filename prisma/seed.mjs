@@ -35,13 +35,18 @@ async function main() {
     const data = JSON.parse(readFileSync(join(__dirname, 'seed-data.json'), 'utf-8'));
     let pos = 0;
     for (const it of data) {
+      // Un panneau est un lieu autonome ; l'itinéraire le référence via un arrêt.
       await prisma.itinerary.create({
         data: {
           name: it.name,
           city: it.city ?? null,
+          kind: 'circo',
           position: pos++,
-          panels: {
-            create: it.panels.map((p, i) => ({ name: p.name, lat: p.lat, lng: p.lng, position: i })),
+          stops: {
+            create: it.panels.map((p, i) => ({
+              position: i,
+              panel: { create: { name: p.name, lat: p.lat, lng: p.lng, city: it.city ?? null } },
+            })),
           },
         },
       });

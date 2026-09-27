@@ -20,7 +20,7 @@ const round = (n: number) => Math.round(n * 1e6) / 1e6;
 export default function Editor({
   itinerary,
 }: {
-  itinerary: { id: string; name: string; city: string | null; panels: P[] };
+  itinerary: { id: string; name: string; city: string | null; kind: 'circo' | 'ville'; panels: P[] };
 }) {
   const router = useRouter();
   const [name, setName] = useState(itinerary.name);

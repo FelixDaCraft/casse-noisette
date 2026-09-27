@@ -8,8 +8,8 @@ export const dynamic = 'force-dynamic';
 export default async function AdminHome() {
   await requireAdmin();
   const itineraries = await prisma.itinerary.findMany({
-    orderBy: { position: 'asc' },
-    include: { _count: { select: { panels: true } } },
+    orderBy: [{ kind: 'asc' }, { city: 'asc' }, { position: 'asc' }],
+    include: { _count: { select: { stops: true } } },
   });
   return (
     <>
@@ -20,7 +20,7 @@ export default async function AdminHome() {
         <button className="btn primary">+ Ajouter</button>
       </form>
       <ItineraryAdminList
-        items={itineraries.map((i) => ({ id: i.id, name: i.name, city: i.city, count: i._count.panels }))}
+        items={itineraries.map((i) => ({ id: i.id, name: i.name, city: i.city, kind: i.kind, count: i._count.stops }))}
       />
     </>
   );

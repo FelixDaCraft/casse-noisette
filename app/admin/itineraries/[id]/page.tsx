@@ -10,7 +10,7 @@ export default async function EditItinerary({ params }: { params: Promise<{ id: 
   const { id } = await params;
   const it = await prisma.itinerary.findUnique({
     where: { id },
-    include: { panels: { orderBy: { position: 'asc' } } },
+    include: { stops: { orderBy: { position: 'asc' }, include: { panel: true } } },
   });
   if (!it) notFound();
   return (
@@ -19,7 +19,8 @@ export default async function EditItinerary({ params }: { params: Promise<{ id: 
         id: it.id,
         name: it.name,
         city: it.city,
-        panels: it.panels.map((p) => ({ id: p.id, name: p.name, lat: p.lat, lng: p.lng })),
+        kind: it.kind,
+        panels: it.stops.map((s) => ({ id: s.panel.id, name: s.panel.name, lat: s.panel.lat, lng: s.panel.lng })),
       }}
     />
   );

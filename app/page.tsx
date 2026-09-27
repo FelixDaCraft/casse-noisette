@@ -5,14 +5,15 @@ export const dynamic = 'force-dynamic';
 
 export default async function Home() {
   const itineraries = await prisma.itinerary.findMany({
-    orderBy: [{ city: 'asc' }, { position: 'asc' }],
-    include: { panels: { orderBy: { position: 'asc' } } },
+    orderBy: [{ kind: 'asc' }, { city: 'asc' }, { position: 'asc' }],
+    include: { stops: { orderBy: { position: 'asc' }, include: { panel: true } } },
   });
   const data = itineraries.map((it) => ({
     id: it.id,
     name: it.name,
     city: it.city,
-    panels: it.panels.map((p) => ({ name: p.name, lat: p.lat, lng: p.lng })),
+    kind: it.kind,
+    panels: it.stops.map((s) => ({ name: s.panel.name, lat: s.panel.lat, lng: s.panel.lng })),
   }));
   return <ItineraryList itineraries={data} />;
 }
