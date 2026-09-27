@@ -243,6 +243,99 @@ export async function movePanel(id: string, dir: 'up' | 'down', itineraryId?: st
   revalAll(stop.itineraryId);
 }
 
+
+/* ---------------- Catalogue de panneaux et import ----------------
+   Utilisé par la page Panneaux : créer un panneau sans tournée, le supprimer
+   partout, ou importer une série de points (GPS ou lien Google Maps).
+   Tout point à moins de 40 m d'un panneau existant réutilise ce panneau
+   plutôt que d'en créer un doublon. */
+
+const DEDUP_METERS = 40;
+const hav = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+  const R = 6371000, r = Math.PI / 180, dl = (b.lat - a.lat) * r, dg = (b.lng - a.lng) * r;
+  const x = Math.sin(dl / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dg / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(x));
+};
+
+/** Panneau existant à moins de 40 m, sinon null (évite les doublons). */
+async function findNear(lat: number, lng: number) {
+  const d = 0.0006; // ~65 m
+  const near = await prisma.panel.findMany({
+    where: { lat: { gte: lat - d, lte: lat + d }, lng: { gte: lng - d, lte: lng + d } },
+  });
+  return near.map((p) => ({ p, d: hav({ lat, lng }, p) })).filter((x) => x.d <= DEDUP_METERS).sort((a, b) => a.d - b.d)[0]?.p ?? null;
+}
+
+/** Page Panneaux : crée un panneau sans tournée (clic carte ou GPS avec « Catalogue seulement »). */
+export async function createPanel(input: { name: string; lat: number; lng: number; city?: string | null }) {
+  await requireAdmin();
+  const dup = await findNear(input.lat, input.lng);
+  if (dup) return { id: dup.id, reused: true };
+  const p = await prisma.panel.create({
+    data: { name: input.name.trim() || 'Nouveau panneau', lat: input.lat, lng: input.lng, city: input.city?.trim() || null },
+  });
+  revalidatePath('/admin/panels');
+  return { id: p.id, reused: false };
+}
+
+/** Suppression depuis la page Panneaux : retire le panneau de TOUTES les tournées (Stop cascade). */
+export async function deletePanelEverywhere(id: string) {
+  await requireAdmin();
+  await prisma.panel.delete({ where: { id } });
+  revalidatePath('/'); revalidatePath('/admin'); revalidatePath('/admin/panels');
+}
+
+/**
+ * Import GPS / Google : crée ou réutilise chaque point, puis rattache.
+ * target = 'catalog' | 'new' | <itineraryId>. Respecte MAX_PANELS (le surplus reste au catalogue).
+ */
+export async function importPanels(
+  points: { name: string; lat: number; lng: number }[],
+  target: string,
+  opts: { city?: string; newName?: string } = {},
+) {
+  await requireAdmin();
+  const ids: string[] = [];
+  let created = 0, reused = 0;
+  for (const pt of points) {
+    const r = await createPanel({ ...pt, city: opts.city });
+    ids.push(r.id); r.reused ? reused++ : created++;
+  }
+  const uniq = [...new Set(ids)];
+  let itineraryId: string | null = null, attached = 0, skipped = 0;
+  if (target === 'new') {
+    const stops = uniq.slice(0, MAX_PANELS);
+    skipped = uniq.length - stops.length;
+    const first = await prisma.panel.findUnique({ where: { id: stops[0] } });
+    const lastP = await prisma.panel.findUnique({ where: { id: stops[stops.length - 1] } });
+    const max = await prisma.itinerary.aggregate({ _max: { position: true } });
+    const it = await prisma.itinerary.create({
+      data: {
+        name: opts.newName || `Itinéraire de ${first?.name} à ${lastP?.name}`, // nom « auto » : recalculé côté public
+        city: opts.city?.trim() || null,
+        kind: 'ville',
+        position: (max._max.position ?? -1) + 1,
+        stops: { create: stops.map((panelId, position) => ({ panelId, position })) },
+      },
+    });
+    itineraryId = it.id; attached = stops.length;
+  } else if (target !== 'catalog') {
+    itineraryId = target;
+    const existing = await prisma.stop.findMany({ where: { itineraryId }, orderBy: { position: 'asc' } });
+    const have = new Set(existing.map((s) => s.panelId));
+    let pos = (existing.at(-1)?.position ?? -1) + 1;
+    for (const panelId of uniq) {
+      if (have.has(panelId)) continue;
+      if (existing.length + attached >= MAX_PANELS) { skipped++; continue; }
+      await prisma.stop.create({ data: { itineraryId, panelId, position: pos++ } });
+      attached++;
+    }
+  }
+  revalidatePath('/'); revalidatePath('/admin'); revalidatePath('/admin/panels');
+  if (itineraryId) revalidatePath(`/admin/itineraries/${itineraryId}`);
+  return { created, reused, attached, skipped, itineraryId };
+}
+
 /* ---------------- Comptes admin ---------------- */
 
 export async function createAdmin(_prev: { error?: string; ok?: string } | undefined, formData: FormData) {
