@@ -1,6 +1,7 @@
 'use client';
 import { useState, type ReactNode } from 'react';
-import { gmapsUrl, telegramUrl, cleanName, type Mode } from '@/lib/maps';
+import { gmapsUrl, telegramUrl, cleanName, isAutoName, type Mode } from '@/lib/maps';
+import { useOptimizedOrder, type Status } from './useOptimizedOrder';
 
 type Panel = { name: string; lat: number; lng: number };
 type It = { id: string; name: string; city: string | null; panels: Panel[] };
@@ -42,9 +43,42 @@ const MODE: Record<Mode, { label: string; icon: ReactNode }> = {
   driving: { label: 'Voiture', icon: IconCar },
 };
 
+const IconPin = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z" />
+    <circle cx="12" cy="10" r="2.6" />
+  </svg>
+);
+
+/** Message affiché sous les modes : dit d'où part le calcul, et pourquoi le cas échéant il n'a pas eu lieu. */
+function geoLabel(status: Status, approx: boolean, refining: boolean): string {
+  switch (status) {
+    case 'asking':
+      return 'Autorise la localisation pour adapter l’ordre à ton point de départ';
+    case 'locating':
+      return 'Recherche de ta position…';
+    case 'optimizing':
+      return 'Calcul du meilleur ordre de passage…';
+    case 'ready':
+      if (refining) return 'Ordre adapté à ta position — affinage par la route…';
+      return approx
+        ? 'Ordre adapté à ta position (distances estimées à vol d’oiseau)'
+        : 'Ordre adapté à ta position, par la route';
+    case 'denied':
+      return 'Position refusée — ordre par défaut';
+    case 'unavailable':
+      return 'Position indisponible — ordre par défaut';
+    case 'failed':
+      return 'Calcul indisponible — ordre par défaut';
+  }
+}
+
 export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
   const [mode, setMode] = useState<Mode>('driving');
   const total = itineraries.reduce((s, it) => s + it.panels.length, 0);
+  const { status, orders, approx, refining, retry } = useOptimizedOrder(itineraries, mode);
+  const canRetry = status === 'denied' || status === 'unavailable' || status === 'failed';
+  // `asking` n'est pas une erreur : le navigateur attend une réponse, pas un clic de plus.
 
   // Regroupement par ville (la liste arrive déjà triée : ville puis position).
   const groups: { city: string; items: It[] }[] = [];
@@ -71,7 +105,8 @@ export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
           </h1>
           <p className="sub">
             {itineraries.length} itinéraires · {total} panneaux · {groups.length} ville
-            {groups.length > 1 ? 's' : ''}. La navigation démarre depuis ta position GPS.
+            {groups.length > 1 ? 's' : ''}. La navigation démarre depuis ta position GPS, et
+            les panneaux sont réordonnés pour que le trajet soit le plus court depuis là où tu es.
           </p>
         </header>
 
@@ -90,6 +125,15 @@ export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
               </button>
             ))}
           </div>
+          <p className={'geo geo-' + (refining ? 'optimizing' : status)} aria-live="polite">
+            <span className="geo-ico">{IconPin}</span>
+            {geoLabel(status, approx, refining)}
+            {canRetry && (
+              <button type="button" className="geo-retry" onClick={retry}>
+                Réessayer
+              </button>
+            )}
+          </p>
         </div>
 
         {itineraries.length === 0 && <p className="muted">Aucun itinéraire pour le moment.</p>}
@@ -100,29 +144,39 @@ export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
               <span className="pin">📍</span> {g.city} <span className="cnt">{g.items.length} itin.</span>
             </h2>
             {g.items.map((it, gi) => {
-              const gUrl = gmapsUrl(it.panels, mode);
+              // Ordre calculé depuis la position si on l'a, sinon celui du backoffice.
+              const ord = orders[it.id];
+              const panels = ord ? ord.map((i) => it.panels[i]) : it.panels;
+              const gUrl = gmapsUrl(panels, mode);
+              // Un nom auto « de X à Y » ne décrit plus le parcours une fois réordonné :
+              // on le recalcule sur les extrémités réelles. Un nom saisi à la main est respecté.
+              const title =
+                ord && panels.length > 1 && isAutoName(it.name)
+                  ? `${panels[0].name || 'Départ'} → ${panels[panels.length - 1].name || 'Arrivée'}`
+                  : cleanName(it.name);
               return (
                 <article className="card" key={it.id} style={{ animationDelay: `${order++ * 60}ms` }}>
                   <h3>
-                    <span className="num">{gi + 1}</span> {cleanName(it.name)}
+                    <span className="num">{gi + 1}</span> {title}
                   </h3>
                   <div className="meta">
-                    <span className="badge">{it.panels.length} panneaux</span>
+                    <span className="badge">{panels.length} panneaux</span>
+                    {ord && <span className="badge badge-opt">ordre optimisé</span>}
                   </div>
                   <a className="cta" href={gUrl} target="_blank" rel="noopener">
                     {IconNav} Ouvrir dans Google Maps
                   </a>
                   <div className="alts">
-                    <a className="alt tg" href={telegramUrl(cleanName(it.name), gUrl)} target="_blank" rel="noopener">
+                    <a className="alt tg" href={telegramUrl(title, gUrl)} target="_blank" rel="noopener">
                       {IconTg} Partager
                     </a>
                   </div>
                   <details>
                     <summary>
-                      {IconChev} Voir les {it.panels.length} panneaux
+                      {IconChev} Voir les {panels.length} panneaux
                     </summary>
                     <ol>
-                      {it.panels.map((p, i) => (
+                      {panels.map((p, i) => (
                         <li key={i}>{p.name || 'Panneau ' + (i + 1)}</li>
                       ))}
                     </ol>
@@ -134,7 +188,8 @@ export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
         ))}
 
         <p className="foot">
-          La navigation démarre depuis ta position GPS vers chaque panneau, dans l&apos;ordre.
+          La navigation démarre depuis ta position GPS et enchaîne les panneaux dans l&apos;ordre
+          le plus court depuis ton point de départ.
         </p>
       </div>
     </>

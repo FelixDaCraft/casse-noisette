@@ -164,3 +164,19 @@ input:focus{outline:none; border-color:var(--lfi)}
   *{animation:none!important; transition:none!important}
   .card{opacity:1!important; transform:none!important}
 }
+
+/* Statut de géolocalisation (ordre de passage adapté au point de départ) */
+.geo{display:flex; align-items:center; gap:8px; margin:0; font-size:.82rem; color:var(--muted); line-height:1.3}
+.geo-ico{display:inline-flex; flex:0 0 auto}
+.geo-ico svg{width:15px; height:15px; display:block}
+.geo-locating .geo-ico, .geo-optimizing .geo-ico{animation:pulse 1.2s ease-in-out infinite}
+.geo-ready{color:#8fd6a4}
+.geo-ready .geo-ico{color:#8fd6a4}
+.geo-denied, .geo-unavailable, .geo-failed{color:#e0b3bb}
+.geo-retry{border:1px solid var(--stroke); background:rgba(255,255,255,.07); color:var(--txt);
+  font:600 .74rem var(--font-inter); padding:4px 10px; border-radius:20px; cursor:pointer; transition:.2s}
+.geo-retry:hover{background:var(--lfi); border-color:transparent; color:#fff}
+.badge-opt{border-color:rgba(143,214,164,.35); color:#8fd6a4; background:rgba(143,214,164,.09)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.geo-asking{color:#f0d9a8}
+.geo-asking .geo-ico{color:#f0d9a8; animation:pulse 1.2s ease-in-out infinite}

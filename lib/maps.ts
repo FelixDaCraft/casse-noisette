@@ -34,6 +34,15 @@ export function telegramUrl(name: string, gUrl: string): string {
   )}`;
 }
 
+/**
+ * Vrai si le nom a été généré automatiquement à partir des extrémités
+ * (« Itinéraire de X à Y ») : il décrit un ordre précis, donc il devient faux
+ * dès que le parcours est réordonné depuis un autre point de départ.
+ */
+export function isAutoName(n: string): boolean {
+  return /^Itin[ée]raire de\s+.+\s+à\s+.+/i.test(n);
+}
+
 /** « Itinéraire de X à Y » -> « X → Y ». */
 export function cleanName(n: string): string {
   return n.replace(/^Itin[ée]raire de\s+/i, '').replace(/\s+à\s+/, ' → ');

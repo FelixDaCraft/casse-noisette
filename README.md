@@ -27,6 +27,9 @@ lance directement en navigation GPS, plus un vrai outil de gestion derrière.
 ## ✨ Fonctionnalités
 
 ### 🌍 Public (`/`)
+- 🧭 **Ordre de passage adapté au point de départ** — les panneaux sont réordonnés
+  automatiquement pour que le trajet soit le plus court **depuis là où tu te trouves**,
+  sur les **distances réelles par la route** (à pied / vélo / voiture).
 - 🗺️ **Google Maps** — itinéraire multi-arrêts + **lancement direct du GPS** (`dir_action=navigate`), toujours depuis la position de l'utilisateur.
 - 📨 **Partage Telegram** par itinéraire.
 - 🚶🚲🚗 Sélecteur de mode + option « depuis ma position ».
@@ -178,8 +181,59 @@ npm run dev                 # → http://localhost:3000
 | `NEXT_PUBLIC_SITE_URL` | URL publique (liens dans les emails) |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` | SMTP (Resend) — optionnel |
 | `MAIL_FROM` | Expéditeur des emails de reset |
+| `OSRM_BASE_URL` | Serveur de routage pour l'ordre de passage (défaut : instance publique FOSSGIS) |
+| `OSRM_TIMEOUT_MS` / `OSRM_MIN_GAP_MS` | Délai max et espacement des requêtes de routage |
+| `OPTIMIZE_BUDGET_MS` | Attente max du routage avant de répondre au vol d'oiseau |
 
 > 🔒 Le `.env` n'est **jamais** committé. En prod il vit dans `/opt/casse-noisette-app/.env`.
+
+---
+
+## 🧭 Ordre de passage adapté au point de départ
+
+Google Maps **ne réordonne jamais** les `waypoints` d'un lien `dir/?api=1` : il les
+suit tels quels. L'ordre saisi dans le backoffice était donc toujours appliqué,
+quel que soit l'endroit d'où partait le militant — d'où des allers-retours inutiles.
+
+La page publique calcule maintenant elle-même le meilleur ordre :
+
+```
+navigateur : position GPS
+        │
+        ▼
+POST /api/optimize  { origin, mode, itineraries }
+        │
+        ├─ matrice panneau↔panneau  ──► OSRM (cache 6 h, une requête groupée
+        │                                pour TOUS les itinéraires d'un coup)
+        ├─ ligne « ma position → panneaux » ──► OSRM (cache 10 min par zone
+        │                                de ~110 m, une seule requête)
+        │      ⏱ au-delà de OPTIMIZE_BUDGET_MS on n'attend plus
+        │
+        ▼
+Held-Karp (optimum exact, ≤ 12 arrêts) ──► ordre des panneaux
+        │
+        ▼
+lien Google Maps construit dans cet ordre
+```
+
+- **Optimum exact, pas une approximation** : avec au plus 10 panneaux
+  (limite Google Maps), la programmation dynamique sur les sous-ensembles donne
+  le meilleur ordre en quelques millisecondes. Parcours **ouvert** : on ne
+  revient pas au point de départ. Matrices **asymétriques** (sens uniques) gérées.
+- **La page ne bloque jamais** : si le routage tarde, elle répond aussitôt avec
+  les distances à vol d'oiseau, puis s'affine toute seule dès que les distances
+  réelles sont là (le bandeau affiche « affinage par la route… »).
+- **Si la position est refusée ou indisponible**, l'ordre du backoffice est
+  conservé et le bandeau l'indique, avec un bouton « Réessayer ».
+- **Nommage** : un itinéraire nommé automatiquement « Itinéraire de X à Y » voit
+  son titre recalculé sur ses extrémités réelles une fois réordonné ; un nom
+  saisi à la main est laissé intact.
+
+> ⚠️ **L'instance publique FOSSGIS fait patienter ~8 s par requête** dès la
+> deuxième (mesuré). Le cache et le regroupement ramènent ça à **2 requêtes pour
+> toute la page**, mais pour un service rapide il faut héberger sa propre
+> instance OSRM et renseigner `OSRM_BASE_URL`. Sans routage disponible, tout
+> continue de fonctionner au vol d'oiseau.
 
 ---
 
