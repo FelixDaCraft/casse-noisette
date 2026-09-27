@@ -22,14 +22,14 @@ const gowun = Gowun_Batang({
 export const metadata: Metadata = {
   title: 'Collage — 4ème circo 44',
   description: 'Itinéraires de collage — 4ème circonscription de Loire-Atlantique',
-  manifest: '/manifest.webmanifest?v=2',
+  manifest: '/manifest.webmanifest?v=3',
   icons: {
     icon: [
-      { url: '/favicon.ico?v=2', sizes: 'any' },
-      { url: '/icon-32.png?v=2', type: 'image/png', sizes: '32x32' },
-      { url: '/icon-16.png?v=2', type: 'image/png', sizes: '16x16' },
+      { url: '/favicon.ico?v=3', sizes: 'any' },
+      { url: '/icon-32.png?v=3', type: 'image/png', sizes: '32x32' },
+      { url: '/icon-16.png?v=3', type: 'image/png', sizes: '16x16' },
     ],
-    apple: '/apple-touch-icon.png?v=2',
+    apple: '/apple-touch-icon.png?v=3',
   },
   appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'Collage 44' },
 };

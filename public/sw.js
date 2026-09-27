@@ -2,14 +2,14 @@
    - HTML : réseau d'abord (contenu frais depuis le cron), cache en secours (hors-ligne)
    - Assets (icônes, polices) : cache d'abord, réseau en secours
    Bump CACHE pour forcer le rafraîchissement du shell. */
-const CACHE = "casse-noisette-v4";
+const CACHE = "casse-noisette-v5";
 const SHELL = [
   "/",
-  "/manifest.webmanifest?v=2",
-  "/icon-192.png?v=2",
-  "/icon-512.png?v=2",
-  "/apple-touch-icon.png?v=2",
-  "/favicon.ico?v=2"
+  "/manifest.webmanifest?v=3",
+  "/icon-192.png?v=3",
+  "/icon-512.png?v=3",
+  "/apple-touch-icon.png?v=3",
+  "/favicon.ico?v=3"
 ];
 
 self.addEventListener("install", (e) => {
