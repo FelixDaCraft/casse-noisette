@@ -326,23 +326,25 @@ function Carte({
       : cleanName(it.name);
 
   return (
-    <article className="tournee">
-      <button type="button" className="tournee-ouvrir" onClick={onOuvrir}>
-        <span className="tournee-num">{num}</span>
-        <span className="tournee-txt">
-          <span className="tournee-titre">{titre}</span>
-          <span className="tournee-meta">
-            <span>{panels.length} panneaux</span>
-            {mesure && <span>{km(mesure.meters)}</span>}
-            {mesure?.seconds != null && <span>{duree(mesure.seconds)}</span>}
+    <div className="tournee-ligne">
+      <article className="tournee">
+        <button type="button" className="tournee-ouvrir" onClick={onOuvrir}>
+          <span className="tournee-num">{num}</span>
+          <span className="tournee-txt">
+            <span className="tournee-titre">{titre}</span>
+            <span className="tournee-meta">
+              <span>{panels.length} panneaux</span>
+              {mesure && <span>{km(mesure.meters)}</span>}
+              {mesure?.seconds != null && <span>{duree(mesure.seconds)}</span>}
+            </span>
           </span>
-        </span>
-        <span className="tournee-chev">{IconChev}</span>
-      </button>
+          <span className="tournee-chev">{IconChev}</span>
+        </button>
+      </article>
       <a className="tournee-gps" href={url} target="_blank" rel="noopener" aria-label="Lancer le GPS">
         {IconNav}
         GPS
       </a>
-    </article>
+    </div>
   );
 }

@@ -345,9 +345,17 @@ button {
   gap: 10px;
 }
 
-.tournee {
+/* La tournée et son bouton GPS sont deux blocs distincts, côte à côte :
+   ouvrir le détail et lancer la navigation sont deux gestes différents. */
+.tournee-ligne {
   display: flex;
   align-items: stretch;
+  gap: 10px;
+}
+.tournee {
+  flex: 1;
+  min-width: 0;
+  display: flex;
   background: var(--blanc);
   border-radius: var(--r-carte);
   border: 1px solid var(--bord-carte);
@@ -424,6 +432,7 @@ button {
   align-items: center;
   justify-content: center;
   gap: 3px;
+  border-radius: var(--r-carte);
   background: var(--rouge);
   color: #fff;
   text-decoration: none;
@@ -431,10 +440,17 @@ button {
   font-weight: 900;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  box-shadow: 0 4px 14px rgba(209, 39, 28, 0.25);
+  transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
 }
 .tournee-gps:hover {
   background: var(--rouge-hover);
   color: #fff;
+  box-shadow: 0 8px 20px rgba(209, 39, 28, 0.35);
+  transform: translateY(-1px);
+}
+.tournee-gps:active {
+  transform: scale(0.97);
 }
 .tournee-gps svg {
   width: 22px;
