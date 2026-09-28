@@ -1,12 +1,12 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { gmapsUrl, cleanName, isAutoName, type Mode } from '@/lib/maps';
+import { gmapsUrl, cleanName, isAutoName, rueSeule, type Mode } from '@/lib/maps';
 import { useOptimizedOrder, type Status, type Mesure } from './useOptimizedOrder';
 import { useFavoris } from './useFavoris';
 import Marque, { DuoVioletDef } from './Marque';
 import TourneeDetail, { type NoteOrdre } from './TourneeDetail';
 
-type Panel = { name: string; lat: number; lng: number };
+type Panel = { name: string; lat: number; lng: number; city: string | null };
 type Kind = 'circo' | 'ville';
 type It = { id: string; name: string; city: string | null; kind: Kind; panels: Panel[] };
 
@@ -393,10 +393,21 @@ function Carte({
   const url = gmapsUrl(panels, mode);
   // Un nom auto « de X à Y » ne décrit plus le parcours une fois réordonné :
   // on le recalcule sur les extrémités réelles, un nom saisi à la main est gardé.
+  // Seules les rues : le complément d'adresse est réservé au détail.
   const titre =
-    ordre && panels.length > 1 && isAutoName(it.name)
-      ? `${panels[0].name || 'Départ'} → ${panels[panels.length - 1].name || 'Arrivée'}`
+    panels.length > 1 && isAutoName(it.name)
+      ? `${rueSeule(panels[0].name) || 'Départ'} → ${rueSeule(panels[panels.length - 1].name) || 'Arrivée'}`
       : cleanName(it.name);
+
+  // Une tournée de circonscription traverse plusieurs communes : savoir
+  // lesquelles vaut mieux, pour choisir, que des chiffres qu'on relira dans le
+  // détail. Une tournée de commune n'a rien à dire là-dessus — sa carte laisse
+  // alors le titre s'étaler sur deux lignes, et les deux rues se lisent en
+  // entier au lieu d'être coupées.
+  const communes =
+    it.kind === 'circo'
+      ? [...new Set(panels.map((p) => p.city?.trim()).filter(Boolean))].join(' · ')
+      : '';
 
   return (
     <div className="tournee-ligne">
@@ -405,13 +416,7 @@ function Carte({
           <span className="tournee-num">{num}</span>
           <span className="tournee-txt">
             <span className="tournee-titre">{titre}</span>
-            <span className="tournee-meta">
-              <span>
-              {panels.length} panneau{panels.length > 1 ? 'x' : ''}
-            </span>
-              {mesure && <span>{km(mesure.meters)}</span>}
-              {mesure?.seconds != null && <span>{duree(mesure.seconds)}</span>}
-            </span>
+            {communes && <span className="tournee-meta">{communes}</span>}
           </span>
           <span className="tournee-chev">{IconChev}</span>
         </button>

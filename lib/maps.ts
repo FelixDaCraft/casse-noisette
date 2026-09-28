@@ -47,3 +47,15 @@ export function isAutoName(n: string): boolean {
 export function cleanName(n: string): string {
   return n.replace(/^Itin[ée]raire de\s+/i, '').replace(/\s+à\s+/, ' → ');
 }
+
+/** « Rue des Réformes — Au 14 » -> « Rue des Réformes ».
+ *
+ *  L'inventaire de la métropole accole un complément d'adresse au nom de voie
+ *  (« — Au 14 », « — angle Bd de la Liberté »). Utile sur le terrain, donc
+ *  gardé dans le détail, mais sur une carte de liste il fait déborder le titre :
+ *  les deux extrémités de la tournée deviennent illisibles alors que ce sont
+ *  justement elles qu'on cherche à comparer.
+ */
+export function rueSeule(n: string): string {
+  return n.split(' — ')[0].trim() || n;
+}

@@ -13,7 +13,12 @@ export default async function Home() {
     name: it.name,
     city: it.city,
     kind: it.kind,
-    panels: it.stops.map((s) => ({ name: s.panel.name, lat: s.panel.lat, lng: s.panel.lng })),
+    panels: it.stops.map((s) => ({
+      name: s.panel.name,
+      lat: s.panel.lat,
+      lng: s.panel.lng,
+      city: s.panel.city,
+    })),
   }));
   return <ItineraryList itineraries={data} />;
 }

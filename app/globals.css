@@ -487,21 +487,31 @@ button {
   font-weight: 800;
   font-size: 15px;
   line-height: 1.25;
-  /* Une seule ligne : la hauteur est celle du bouton, le titre complet reste
-     visible dans le détail. */
+  /* Une seule ligne quand une seconde ligne d'info suit : la hauteur de la
+     carte est celle du bouton GPS et ne bouge pas. */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Sans seconde ligne, le titre prend la place libre : « Rue A → Rue B » se lit
+   alors en entier plutôt que de se faire couper. */
+.tournee-titre:only-child {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  text-overflow: clip;
+}
+/* Les communes traversées, en une ligne. Du texte simple et non plus une
+   rangée de blocs : coupée, une liste trop longue finit par « … » au lieu de
+   laisser un « · » orphelin. */
 .tournee-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   font-size: 12px;
   color: var(--gris);
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 .tournee-chev {
   flex: none;
