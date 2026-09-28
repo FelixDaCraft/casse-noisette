@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { gmapsUrl, cleanName, isAutoName, type Mode } from '@/lib/maps';
 import { useOptimizedOrder, type Status, type Mesure } from './useOptimizedOrder';
 import { useFavoris } from './useFavoris';
@@ -152,20 +152,38 @@ export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
 
   // Le détail est une vue, pas une page : on garde l'ordre déjà calculé et la
   // position, sans recharger. Une entrée d'historique rend le retour du
-  // navigateur naturel.
+  // navigateur naturel. Le revers, c'est qu'aucune navigation ne remet le
+  // défilement à zéro : sans ça, ouvrir une tournée prise en bas de liste
+  // affichait son détail déjà défilé, carte coupée.
+  const placeDansListe = useRef(0);
+  const venaitDuDetail = useRef(false);
+
   const fermer = useCallback(() => {
     if (typeof history !== 'undefined' && history.state?.cnDetail) history.back();
     else setOuverte(null);
   }, []);
   const ouvrir = useCallback((id: string) => {
+    placeDansListe.current = scrollY;
     setOuverte(id);
     history.pushState({ cnDetail: true }, '');
+    scrollTo(0, 0);
   }, []);
   useEffect(() => {
     const onPop = () => setOuverte(null);
     addEventListener('popstate', onPop);
     return () => removeEventListener('popstate', onPop);
   }, []);
+  // Au retour, la liste reprend là où elle était — remonter le militant en
+  // haut de 62 tournées serait aussi pénible que l'inverse.
+  useEffect(() => {
+    if (ouverte) {
+      venaitDuDetail.current = true;
+      return;
+    }
+    if (!venaitDuDetail.current) return; // premier rendu : ne rien imposer
+    venaitDuDetail.current = false;
+    scrollTo(0, placeDansListe.current);
+  }, [ouverte]);
   const compte = (k: Kind) => itineraries.filter((it) => it.kind === k).length;
   const canRetry = status === 'denied' || status === 'unavailable' || status === 'failed';
 
