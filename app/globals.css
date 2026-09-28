@@ -313,6 +313,52 @@ button {
   border-color: var(--charbon);
   color: var(--creme);
 }
+/* Libellé réservé aux lecteurs d'écran. */
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Favoris : le secteur où l'on colle d'habitude, retenu par l'appareil. */
+.fav {
+  margin-left: auto;
+  /* L'en-tête aligne ses textes sur la ligne de base ; une icône n'en a pas. */
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--r-petit);
+  background: transparent;
+  color: var(--bord-champ);
+  cursor: pointer;
+  transition: color 0.15s, transform 0.1s;
+}
+.fav:hover {
+  color: var(--violet);
+}
+.fav:active {
+  transform: scale(0.88);
+}
+.fav.actif {
+  color: var(--rouge);
+}
+.chip .etoile {
+  display: inline-flex;
+  margin-right: 5px;
+  vertical-align: -1px;
+  color: var(--rouge);
+}
+.chip.actif .etoile {
+  color: var(--creme);
+}
+
 /* Commune d'une entrée « commune · quartier » : présente, mais en retrait. */
 .lieu-mere {
   font-weight: 500;
@@ -346,6 +392,12 @@ button {
   color: inherit;
   letter-spacing: inherit;
   text-transform: inherit;
+  /* Sur mobile, « Nantes · Bellevue - Chantenay - Sainte-Anne » doit passer à
+     la ligne plutôt que pousser l'étoile hors de l'écran. */
+  min-width: 0;
+}
+.groupe h2 > span:not(.lieu-nom) {
+  white-space: nowrap;
 }
 .groupe h2 > span:not(.lieu-nom) {
   font-weight: 600;

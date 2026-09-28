@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { gmapsUrl, cleanName, isAutoName, type Mode } from '@/lib/maps';
 import { useOptimizedOrder, type Status, type Mesure } from './useOptimizedOrder';
+import { useFavoris } from './useFavoris';
 import Marque, { DuoVioletDef } from './Marque';
 import TourneeDetail, { type NoteOrdre } from './TourneeDetail';
 
@@ -31,6 +32,20 @@ function Lieu({ nom }: { nom: string }) {
 const IconNav = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
     <polygon points="3 11 22 2 13 21 11 13 3 11" />
+  </svg>
+);
+const IconEtoile = ({ plein, taille = 18 }: { plein: boolean; taille?: number }) => (
+  <svg
+    viewBox="0 0 24 24"
+    width={taille}
+    height={taille}
+    fill={plein ? 'currentColor' : 'none'}
+    stroke="currentColor"
+    strokeWidth={2}
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <polygon points="12 2 15.1 8.6 22 9.6 17 14.6 18.2 21.6 12 18.3 5.8 21.6 7 14.6 2 9.6 8.9 8.6" />
   </svg>
 );
 const IconChev = (
@@ -103,23 +118,31 @@ export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
   );
   const [commune, setCommune] = useState<string | null>(null);
 
+  const { favoris, basculer } = useFavoris();
+
   const duVue = useMemo(() => itineraries.filter((it) => it.kind === vue), [itineraries, vue]);
+  // Une commune et une circonscription peuvent porter le même nom : le favori
+  // retient donc aussi l'onglet d'où il vient.
+  const estFavori = (nom: string) => favoris.includes(`${vue}:${nom}`);
   // « numeric » pour que 10ème circonscription ne passe pas avant la 1ère.
   const ordreGroupe = (a: string, b: string) => a.localeCompare(b, 'fr', { numeric: true });
+  // Les secteurs mis en favori remontent en tête : on ouvre l'app sur le sien.
+  const ordreAffiche = (a: string, b: string) =>
+    Number(estFavori(b)) - Number(estFavori(a)) || ordreGroupe(a, b);
   const communes = useMemo(
-    () => [...new Set(duVue.map((it) => it.city?.trim() || 'Autres'))].sort(ordreGroupe),
+    () => [...new Set(duVue.map((it) => it.city?.trim() || 'Autres'))].sort(ordreAffiche),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [duVue],
+    [duVue, favoris, vue],
   );
   const visibles = useMemo(() => {
     const l = commune ? duVue.filter((it) => (it.city?.trim() || 'Autres') === commune) : duVue;
     return [...l].sort(
       (a, b) =>
-        ordreGroupe(a.city?.trim() || 'Autres', b.city?.trim() || 'Autres') ||
+        ordreAffiche(a.city?.trim() || 'Autres', b.city?.trim() || 'Autres') ||
         a.name.localeCompare(b.name, 'fr'),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [duVue, commune]);
+  }, [duVue, commune, favoris, vue]);
 
   const [ouverte, setOuverte] = useState<string | null>(null);
   const { status, orders, mesures, approx, refining, retry, position } = useOptimizedOrder(
@@ -274,6 +297,11 @@ export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
                 className={'chip' + (commune === c ? ' actif' : '')}
                 onClick={() => setCommune(c)}
               >
+                {estFavori(c) && (
+                  <span className="etoile">
+                    <IconEtoile plein taille={12} />
+                  </span>
+                )}
                 <Lieu nom={c} />
               </button>
             ))}
@@ -291,6 +319,17 @@ export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
               <span>
                 {g.items.length} tournée{g.items.length > 1 ? 's' : ''}
               </span>
+              <button
+                className={'fav' + (estFavori(g.city) ? ' actif' : '')}
+                onClick={() => basculer(`${vue}:${g.city}`)}
+                aria-pressed={estFavori(g.city)}
+                title={estFavori(g.city) ? 'Retirer des favoris' : 'Mettre en favori'}
+              >
+                <IconEtoile plein={estFavori(g.city)} />
+                <span className="sr">
+                  {estFavori(g.city) ? 'Retirer des favoris' : 'Mettre en favori'}
+                </span>
+              </button>
             </h2>
             <div className="liste">
               {g.items.map((it, i) => (
