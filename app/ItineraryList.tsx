@@ -399,10 +399,10 @@ function Carte({
       ? `${rueSeule(panels[0].name) || 'Départ'} → ${rueSeule(panels[panels.length - 1].name) || 'Arrivée'}`
       : cleanName(it.name);
 
-  // Une tournée de circonscription traverse plusieurs communes : savoir
-  // lesquelles vaut mieux, pour choisir, que des chiffres qu'on relira dans le
-  // détail. Une tournée de commune n'a rien à dire là-dessus — sa carte laisse
-  // alors le titre s'étaler sur deux lignes, et les deux rues se lisent en
+  // Une tournée de circonscription traverse plusieurs communes : on choisit
+  // d'abord sur elles, donc elles passent en titre et les rues descendent en
+  // sous-titre. Une tournée de commune n'a rien à dire là-dessus — sa carte
+  // laisse alors les rues s'étaler sur les deux lignes libres et se lire en
   // entier au lieu d'être coupées.
   const communes =
     it.kind === 'circo'
@@ -415,8 +415,8 @@ function Carte({
         <button type="button" className="tournee-ouvrir" onClick={onOuvrir}>
           <span className="tournee-num">{num}</span>
           <span className="tournee-txt">
-            <span className="tournee-titre">{titre}</span>
-            {communes && <span className="tournee-meta">{communes}</span>}
+            <span className="tournee-titre">{communes || titre}</span>
+            {communes && <span className="tournee-meta">{titre}</span>}
           </span>
           <span className="tournee-chev">{IconChev}</span>
         </button>

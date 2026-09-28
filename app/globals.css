@@ -502,9 +502,8 @@ button {
   white-space: normal;
   text-overflow: clip;
 }
-/* Les communes traversées, en une ligne. Du texte simple et non plus une
-   rangée de blocs : coupée, une liste trop longue finit par « … » au lieu de
-   laisser un « · » orphelin. */
+/* Le parcours sous le titre, en une ligne. Du texte simple et non plus une
+   rangée de blocs : coupé, il finit par « … » au lieu d'un « · » orphelin. */
 .tournee-meta {
   font-size: 12px;
   color: var(--gris);
