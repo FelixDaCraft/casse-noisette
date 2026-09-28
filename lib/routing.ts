@@ -248,35 +248,51 @@ export async function optimizeItineraries(
     const line = fromOrigin.get(key) ?? null;
     const fallback = haversineMatrix(it.panels);
 
-    // cost[0] = depuis la position ; cost[i+1][j+1] = de panneau à panneau.
-    // Le retour vers la position ne sert jamais (parcours ouvert) : laissé à 0.
-    const cost: number[][] = Array.from({ length: n + 1 }, () => new Array(n + 1).fill(0));
+    // Deux matrices sur la même grille : [0] = depuis la position,
+    // [i+1][j+1] = de panneau à panneau. Le retour vers la position ne sert
+    // jamais (parcours ouvert) : laissé à 0.
+    const metres: number[][] = Array.from({ length: n + 1 }, () => new Array(n + 1).fill(0));
+    const secondes: number[][] = Array.from({ length: n + 1 }, () => new Array(n + 1).fill(0));
     let usedOsrm = true;
+    let tempsComplet = Boolean(durees && line);
     for (let a = 0; a < n; a++) {
       const d = line?.d[a];
-      if (typeof d === 'number' && Number.isFinite(d)) cost[0][a + 1] = d;
+      if (typeof d === 'number' && Number.isFinite(d)) metres[0][a + 1] = d;
       else {
-        cost[0][a + 1] = haversine(origin, it.panels[a]);
+        metres[0][a + 1] = haversine(origin, it.panels[a]);
         usedOsrm = false;
       }
+      const s = line?.t[a];
+      if (typeof s === 'number' && Number.isFinite(s)) secondes[0][a + 1] = s;
+      else tempsComplet = false;
+
       for (let b = 0; b < n; b++) {
         const m = matrix?.[a]?.[b];
-        if (typeof m === 'number' && Number.isFinite(m)) cost[a + 1][b + 1] = m;
+        if (typeof m === 'number' && Number.isFinite(m)) metres[a + 1][b + 1] = m;
         else {
-          cost[a + 1][b + 1] = fallback[a][b];
+          metres[a + 1][b + 1] = fallback[a][b];
           if (a !== b) usedOsrm = false;
         }
+        const t = durees?.[a]?.[b];
+        if (typeof t === 'number' && Number.isFinite(t)) secondes[a + 1][b + 1] = t;
+        else if (a !== b) tempsComplet = false;
       }
     }
 
-    const { order, meters } = solveOpenPath(cost);
+    // On classe sur le temps de trajet, pas sur les kilomètres : à vélo et
+    // surtout en voiture, sens interdits et limitations font qu'un chemin plus
+    // long peut être plus rapide. À pied les deux se valent, le profil piéton
+    // marchant à vitesse constante. Sans matrice de durées complète, la
+    // distance reste le meilleur substitut.
+    const { order } = solveOpenPath(tempsComplet ? secondes : metres);
 
     // Ce qu'on affiche, c'est la tournée elle-même : du premier au dernier
     // panneau, sans le trajet pour s'y rendre. Sinon une tournée de 5 km à
     // l'autre bout de la circo s'annoncerait à 17 km, ce qui n'aide personne.
     // L'optimisation, elle, continue de tenir compte de l'approche.
     let tourMeters = 0;
-    for (let k = 1; k < order.length; k++) tourMeters += cost[order[k - 1] + 1][order[k] + 1];
+    for (let k = 1; k < order.length; k++) tourMeters += metres[order[k - 1] + 1][order[k] + 1];
+    const meters = (order.length ? metres[0][order[0] + 1] : 0) + tourMeters;
 
     let seconds: number | null = null;
     if (durees && order.length) {
