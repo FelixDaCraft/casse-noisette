@@ -11,7 +11,7 @@ type Item = { id: string; name: string; city: string | null; count: number; kind
 
 const VUES: { kind: Kind; label: string }[] = [
   { kind: 'ville', label: 'Par commune' },
-  { kind: 'circo', label: '4ᵉ circo' },
+  { kind: 'circo', label: 'Par circonscription' },
 ];
 
 export default function ItineraryAdminList({

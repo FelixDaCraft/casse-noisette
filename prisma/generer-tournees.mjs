@@ -1,4 +1,7 @@
-// Construit les tournées « par commune » à partir de tous les panneaux connus.
+// Construit les tournées, dans les deux vues du site :
+//   --ville  une famille par commune       (kind = ville, city = la commune)
+//   --circo  une famille par circonscription (kind = circo, city = la circo)
+// Sans option, les deux sont régénérées.
 //
 // Méthode « tourner d'abord, découper ensuite » : on calcule une grande tournée
 // optimale sur tous les panneaux de la commune, puis on la tranche en paquets
@@ -9,16 +12,17 @@
 // Les distances viennent de l'instance OSRM (profil piéton : le collage urbain
 // se fait à pied). Sans OSRM joignable, on retombe sur le vol d'oiseau.
 //
-//   node prisma/generer-tournees-ville.mjs [--dry]
+//   node prisma/generer-tournees-ville.mjs [--dry] [--ville] [--circo]
 //
-// Relançable : les tournées `ville` existantes sont remplacées, celles de type
-// `circo` ne sont jamais touchées.
+// Relançable : seules les familles régénérées sont remplacées.
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 const MAX_ARRETS = 10;
 const OSRM = process.env.OSRM_URL_WALKING || 'http://127.0.0.1:5102';
 const DRY = process.argv.includes('--dry');
+const SEULEMENT = ['ville', 'circo'].filter((k) => process.argv.includes(`--${k}`));
+const FAMILLES = SEULEMENT.length ? SEULEMENT : ['ville', 'circo'];
 
 const rad = (d) => (d * Math.PI) / 180;
 const hav = (a, b) => {
@@ -119,54 +123,63 @@ function decoupage(n) {
 }
 
 async function main() {
-  const panneaux = await prisma.panel.findMany({ where: { city: { not: null } } });
-  const villes = [...new Set(panneaux.map((p) => p.city))].sort();
-  console.log(`${panneaux.length} panneaux, ${villes.length} communes\n`);
+  for (const famille of FAMILLES) {
+    const champ = famille === 'ville' ? 'city' : 'district';
+    const panneaux = await prisma.panel.findMany({ where: { [champ]: { not: null } } });
+    const groupes = [...new Set(panneaux.map((p) => p[champ]))].sort((a, b) =>
+      String(a).localeCompare(String(b), 'fr', { numeric: true }),
+    );
+    console.log(`\n=== ${famille.toUpperCase()} — ${panneaux.length} panneaux, ${groupes.length} groupes`);
 
-  const plan = [];
-  for (const ville of villes) {
-    const pts = panneaux.filter((p) => p.city === ville);
-    const osrm = await matriceOsrm(pts);
-    const d = matrice(pts, osrm);
-    const global = tourneeGlobale(d);
-    const tailles = decoupage(pts.length);
+    const plan = [];
+    for (const g of groupes) {
+      const pts = panneaux.filter((p) => p[champ] === g);
+      const osrm = await matriceOsrm(pts);
+      const d = matrice(pts, osrm);
+      const global = tourneeGlobale(d);
+      const tailles = decoupage(pts.length);
 
-    let k = 0;
-    const tournees = tailles.map((t) => {
-      const paquet = global.slice(k, k + t); k += t;
-      const ordonne = ordreExact(d, paquet);
-      const metres = ordonne.slice(1).reduce((s, v, i) => s + d[ordonne[i]][v], 0);
-      return { panneaux: ordonne.map((i) => pts[i]), metres };
-    });
-    plan.push({ ville, source: osrm ? 'route' : 'vol d’oiseau', tournees });
-    console.log(`${ville} — ${pts.length} panneaux, ${tournees.length} tournée(s) [${osrm ? 'distances routières' : 'vol d’oiseau'}]`);
-    tournees.forEach((t, i) => console.log(
-      `   ${i + 1}. ${String(t.panneaux.length).padStart(2)} arrêts, ${(t.metres / 1000).toFixed(2)} km` +
-      `  ${t.panneaux[0].name} → ${t.panneaux[t.panneaux.length - 1].name}`));
-  }
-
-  if (DRY) { console.log('\n(--dry : rien écrit en base)'); return; }
-
-  const ancien = await prisma.itinerary.deleteMany({ where: { kind: 'ville' } });
-  if (ancien.count) console.log(`\n${ancien.count} tournée(s) de commune remplacée(s)`);
-
-  let pos = 0, creees = 0;
-  for (const { ville, tournees } of plan) {
-    for (const t of tournees) {
-      const premier = t.panneaux[0].name, dernier = t.panneaux[t.panneaux.length - 1].name;
-      await prisma.itinerary.create({
-        data: {
-          name: `Itinéraire de ${premier} à ${dernier}`,
-          city: ville,
-          kind: 'ville',
-          position: pos++,
-          stops: { create: t.panneaux.map((p, i) => ({ panelId: p.id, position: i })) },
-        },
+      let k = 0;
+      const tournees = tailles.map((t) => {
+        const paquet = global.slice(k, k + t);
+        k += t;
+        const ordonne = ordreExact(d, paquet);
+        const metres = ordonne.slice(1).reduce((s, v, i) => s + d[ordonne[i]][v], 0);
+        return { panneaux: ordonne.map((i) => pts[i]), metres };
       });
-      creees++;
+      plan.push({ groupe: g, tournees });
+      console.log(
+        `${g} — ${pts.length} panneaux, ${tournees.length} tournée(s)` +
+          ` [${osrm ? 'distances routières' : 'vol d’oiseau'}]`,
+      );
     }
+
+    if (DRY) continue;
+
+    const ancien = await prisma.itinerary.deleteMany({ where: { kind: famille } });
+    if (ancien.count) console.log(`${ancien.count} tournée(s) remplacée(s)`);
+
+    let pos = 0, creees = 0;
+    for (const { groupe, tournees } of plan) {
+      for (const t of tournees) {
+        const premier = t.panneaux[0].name;
+        const dernier = t.panneaux[t.panneaux.length - 1].name;
+        await prisma.itinerary.create({
+          data: {
+            name: `Itinéraire de ${premier} à ${dernier}`,
+            city: groupe,
+            kind: famille,
+            position: pos++,
+            stops: { create: t.panneaux.map((p, i) => ({ panelId: p.id, position: i })) },
+          },
+        });
+        creees++;
+      }
+    }
+    console.log(`${creees} tournées créées`);
   }
-  console.log(`${creees} tournées de commune créées`);
+
+  if (DRY) console.log('\n(--dry : rien écrit en base)');
 }
 
 main().catch((e) => { console.error(e); process.exit(1); }).finally(() => prisma.$disconnect());

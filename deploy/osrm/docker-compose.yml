@@ -23,7 +23,7 @@ services:
     image: ghcr.io/project-osrm/osrm-backend:latest
     container_name: osrm-car
     restart: unless-stopped
-    command: osrm-routed --algorithm mld --max-table-size 200 /data/car/region.osrm
+    command: osrm-routed --algorithm mld --max-table-size 600 /data/car/region.osrm
     volumes:
       - ./data:/data:ro
     ports:
@@ -41,7 +41,7 @@ services:
     image: ghcr.io/project-osrm/osrm-backend:latest
     container_name: osrm-bike
     restart: unless-stopped
-    command: osrm-routed --algorithm mld --max-table-size 200 /data/bike/region.osrm
+    command: osrm-routed --algorithm mld --max-table-size 600 /data/bike/region.osrm
     volumes:
       - ./data:/data:ro
     ports:
@@ -59,7 +59,7 @@ services:
     image: ghcr.io/project-osrm/osrm-backend:latest
     container_name: osrm-foot
     restart: unless-stopped
-    command: osrm-routed --algorithm mld --max-table-size 200 /data/foot/region.osrm
+    command: osrm-routed --algorithm mld --max-table-size 600 /data/foot/region.osrm
     volumes:
       - ./data:/data:ro
     ports:

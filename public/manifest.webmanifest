@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Collage — 4ème circo 44",
-  "short_name": "Collage 44",
-  "description": "Itinéraires de collage — 4ème circonscription de Loire-Atlantique",
+  "name": "Collage — agglomération nantaise",
+  "short_name": "Collage",
+  "description": "Itinéraires de collage — panneaux d'affichage libre de l'agglomération nantaise",
   "lang": "fr",
   "start_url": "/",
   "scope": "/",

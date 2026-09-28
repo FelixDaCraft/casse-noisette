@@ -11,7 +11,7 @@ type It = { id: string; name: string; city: string | null; kind: Kind; panels: P
 
 const VUE: { kind: Kind; label: string }[] = [
   { kind: 'ville', label: 'Par commune' },
-  { kind: 'circo', label: '4ᵉ circonscription' },
+  { kind: 'circo', label: 'Par circonscription' },
 ];
 
 const IconNav = (
@@ -90,17 +90,22 @@ export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
   const [commune, setCommune] = useState<string | null>(null);
 
   const duVue = useMemo(() => itineraries.filter((it) => it.kind === vue), [itineraries, vue]);
+  // « numeric » pour que 10ème circonscription ne passe pas avant la 1ère.
+  const ordreGroupe = (a: string, b: string) => a.localeCompare(b, 'fr', { numeric: true });
   const communes = useMemo(
-    () =>
-      [...new Set(duVue.map((it) => it.city?.trim() || 'Autres'))].sort((a, b) =>
-        a.localeCompare(b, 'fr'),
-      ),
+    () => [...new Set(duVue.map((it) => it.city?.trim() || 'Autres'))].sort(ordreGroupe),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [duVue],
   );
-  const visibles = useMemo(
-    () => (commune ? duVue.filter((it) => (it.city?.trim() || 'Autres') === commune) : duVue),
-    [duVue, commune],
-  );
+  const visibles = useMemo(() => {
+    const l = commune ? duVue.filter((it) => (it.city?.trim() || 'Autres') === commune) : duVue;
+    return [...l].sort(
+      (a, b) =>
+        ordreGroupe(a.city?.trim() || 'Autres', b.city?.trim() || 'Autres') ||
+        a.name.localeCompare(b.name, 'fr'),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [duVue, commune]);
 
   const [ouverte, setOuverte] = useState<string | null>(null);
   const { status, orders, mesures, approx, refining, retry, position } = useOptimizedOrder(
@@ -162,7 +167,7 @@ export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
         <DuoVioletDef />
         <TourneeDetail
           titre={titre}
-          kicker={selection.kind === 'circo' ? `4ᵉ circo · ${commune}` : commune}
+          kicker={commune}
           panels={panels}
           mode={mode}
           mesure={mesures[selection.id]}
@@ -241,7 +246,7 @@ export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
           ))}
         </div>
 
-        {vue === 'ville' && communes.length >= 2 && (
+        {communes.length >= 2 && (
           <div className="chips">
             <button
               className={'chip' + (commune === null ? ' actif' : '')}

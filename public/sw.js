@@ -1,4 +1,4 @@
-/* Service worker — Collage 4ème circo 44
+/* Service worker — Collage agglomération nantaise
    - HTML : réseau d'abord (contenu frais depuis le cron), cache en secours (hors-ligne)
    - Assets (icônes, polices) : cache d'abord, réseau en secours
    Bump CACHE pour forcer le rafraîchissement du shell. */

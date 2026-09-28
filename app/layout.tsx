@@ -20,8 +20,8 @@ const gowun = Gowun_Batang({
 });
 
 export const metadata: Metadata = {
-  title: 'Collage — 4ème circo 44',
-  description: 'Itinéraires de collage — 4ème circonscription de Loire-Atlantique',
+  title: 'Collage — agglomération nantaise',
+  description: 'Itinéraires de collage — panneaux d’affichage libre de l’agglomération nantaise',
   manifest: '/manifest.webmanifest?v=3',
   icons: {
     icon: [
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     ],
     apple: '/apple-touch-icon.png?v=3',
   },
-  appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'Collage 44' },
+  appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'Collage' },
 };
 
 export const viewport: Viewport = { themeColor: '#4C0297' };

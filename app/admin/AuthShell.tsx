@@ -21,11 +21,11 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
             Back<em>office</em>
           </h1>
           <p className="prose">
-            Prépare les tournées de collage de la 4ᵉ circonscription : communes, panneaux, ordre de
-            passage.
+            Prépare les tournées de collage de l’agglomération nantaise : communes,
+            circonscriptions, panneaux, ordre de passage.
           </p>
         </div>
-        <span className="auth-circo">4ᵉ circo · Loire-Atlantique</span>
+        <span className="auth-circo">Agglomération nantaise · Loire-Atlantique</span>
       </div>
       <div className="auth-droite">
         <div className="auth-form">{children}</div>

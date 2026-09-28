@@ -63,11 +63,13 @@ model Panel {
   name      String
   lat       Float
   lng       Float
-  city      String? // commune réelle du panneau (géocodage), sert au découpage
+  city      String? // commune réelle du panneau, sert au découpage par commune
+  district  String? // circonscription législative, sert au découpage par circo
   stops     Stop[]
   createdAt DateTime @default(now())
 
   @@index([city])
+  @@index([district])
 }
 
 /// Passage d'un itinéraire par un panneau, à une position donnée.

@@ -2,7 +2,7 @@
 
 # 🥜 Casse-Noisette
 
-### Itinéraires de collage — 4ᵉ circonscription de Loire-Atlantique
+### Itinéraires de collage — agglomération nantaise
 
 Application web pour **gérer** et **suivre sur le terrain** les itinéraires de collage d'affiches :
 une page publique qui ouvre la navigation GPS d'un clic, et un backoffice complet pour

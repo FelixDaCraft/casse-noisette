@@ -13,7 +13,8 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const UA = 'casse-noisette/1.0 (noreply@casse-noisette.aynn.fr)';
-const VIEWBOX = '-1.75,47.25,-1.40,47.08'; // 4e circo 44, préférence (non bornant)
+// Agglomération nantaise : simple préférence de recherche, non bornante.
+const VIEWBOX = '-1.80,47.35,-1.35,47.05';
 const cache = new Map<string, { at: number; v: unknown }>();
 const TTL = 1000 * 60 * 60 * 24 * 7;
 let last = 0;
