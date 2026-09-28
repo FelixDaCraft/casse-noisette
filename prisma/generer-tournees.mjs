@@ -19,8 +19,11 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 const MAX_ARRETS = 10;
-/** Au-delà de ce nombre de panneaux, une commune se découpe par quartier. */
-const SEUIL_QUARTIER = 40;
+/** Au-delà de ce nombre de panneaux, une commune se découpe par quartier.
+ *  Seule Nantes est concernée (202 panneaux, la suivante en compte 48) : une
+ *  commune qu'on couvre en quatre ou cinq tournées se tient très bien d'un
+ *  bloc, et la découper n'ajoute qu'un niveau de lecture inutile. */
+const SEUIL_QUARTIER = 100;
 const OSRM = process.env.OSRM_URL_WALKING || 'http://127.0.0.1:5102';
 const DRY = process.argv.includes('--dry');
 const SEULEMENT = ['ville', 'circo'].filter((k) => process.argv.includes(`--${k}`));
