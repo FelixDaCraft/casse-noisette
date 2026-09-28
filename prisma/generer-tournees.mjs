@@ -9,8 +9,14 @@
 // cohérents — découper au hasard donnerait des tournées qui se croisent.
 // L'ordre interne de chaque paquet est ensuite re-résolu exactement.
 //
-// Les distances viennent de l'instance OSRM (profil piéton : le collage urbain
-// se fait à pied). Sans OSRM joignable, on retombe sur le vol d'oiseau.
+// Tout se calcule en **temps de trajet voiture** : les collages se font
+// rarement à pied, et en voiture sens interdits et limitations font qu'un
+// chemin plus long peut être plus rapide. Deux critères en découlent : la
+// durée totale, et l'écart entre tournées d'un même groupe — un militant ne
+// doit pas hériter de 80 minutes quand son voisin en a 25.
+//
+// Les durées viennent de l'instance OSRM (profil voiture). Sans OSRM
+// joignable, on retombe sur le vol d'oiseau à vitesse urbaine.
 //
 //   node prisma/generer-tournees-ville.mjs [--dry] [--ville] [--circo]
 //
@@ -24,7 +30,11 @@ const MAX_ARRETS = 10;
  *  commune qu'on couvre en quatre ou cinq tournées se tient très bien d'un
  *  bloc, et la découper n'ajoute qu'un niveau de lecture inutile. */
 const SEUIL_QUARTIER = 100;
-const OSRM = process.env.OSRM_URL_WALKING || 'http://127.0.0.1:5102';
+const OSRM = process.env.OSRM_URL_DRIVING || 'http://127.0.0.1:5100';
+/** Ce qu'on accepte de perdre en durée totale pour resserrer l'écart entre
+ *  tournées : une seconde d'écart pèse autant que POIDS_EQUILIBRE secondes de
+ *  trajet. Au-delà, on rallonge tout le monde pour aligner deux tournées. */
+const POIDS_EQUILIBRE = 2;
 const DRY = process.argv.includes('--dry');
 const SEULEMENT = ['ville', 'circo'].filter((k) => process.argv.includes(`--${k}`));
 const FAMILLES = SEULEMENT.length ? SEULEMENT : ['ville', 'circo'];
@@ -47,11 +57,12 @@ async function matriceOsrm(points, etiquette = '') {
     try {
       // `connection: close` : plusieurs minutes de calcul séparent deux groupes,
       // OSRM ferme la socket entre-temps et sa réutilisation échoue sèchement.
-      const r = await fetch(`${OSRM}/table/v1/driving/${path}?annotations=distance`,
+      const r = await fetch(`${OSRM}/table/v1/driving/${path}?annotations=distance,duration`,
         { headers: { connection: 'close' }, signal: AbortSignal.timeout(30000) });
       const j = await r.json().catch(() => ({}));
       if (r.ok && j.code === 'Ok' && j.distances) {
-        return j.distances.map((row) => row.map((v) => (typeof v === 'number' ? v : NaN)));
+        const nb = (m) => m.map((row) => row.map((v) => (typeof v === 'number' ? v : NaN)));
+        return { d: nb(j.distances), t: j.durations ? nb(j.durations) : null };
       }
       console.warn(`  ! OSRM ${etiquette} (${points.length} pts) : HTTP ${r.status} ${j.code ?? ''} ${j.message ?? ''}`.trimEnd());
     } catch (e) {
@@ -62,12 +73,16 @@ async function matriceOsrm(points, etiquette = '') {
   return null;
 }
 
-function matrice(points, osrm) {
+/** Vitesse urbaine de secours, pour estimer une durée quand OSRM ne répond pas
+ *  (30 km/h). */
+const VITESSE_SECOURS = 8.3; // m/s
+
+function matrice(points, source, defaut) {
   const n = points.length;
   return Array.from({ length: n }, (_, i) =>
     Array.from({ length: n }, (_, j) => {
-      const v = osrm?.[i]?.[j];
-      return typeof v === 'number' && Number.isFinite(v) ? v : hav(points[i], points[j]);
+      const v = source?.[i]?.[j];
+      return typeof v === 'number' && Number.isFinite(v) ? v : defaut(points[i], points[j]);
     }));
 }
 
@@ -188,7 +203,15 @@ function ordreRapide(d, idx) {
  */
 function ameliorer(d, tours, maxArrets) {
   const cout = (t) => longueur(d, t);
-  let total = tours.reduce((s, t) => s + cout(t), 0);
+  let couts = tours.map(cout);
+
+  // On ne cherche plus seulement la durée totale la plus basse : à total égal,
+  // quatre tournées de 50 minutes valent mieux que 80, 25, 27 et 80.
+  const objectif = (cs) => {
+    const total = cs.reduce((s, x) => s + x, 0);
+    return cs.length < 2 ? total : total + POIDS_EQUILIBRE * (Math.max(...cs) - Math.min(...cs));
+  };
+  let obj = objectif(couts);
 
   /** Meilleur coût d'insertion de `v` dans `t`, et position associée. */
   const meilleureInsertion = (t, v) => {
@@ -200,23 +223,29 @@ function ameliorer(d, tours, maxArrets) {
     return best;
   };
 
-  for (let passe = 0; passe < 30; passe++) {
+  for (let passe = 0; passe < 60; passe++) {
     let gagne = false;
 
     // Déplacements
     for (let a = 0; a < tours.length && !gagne; a++) {
+      // Vider une tournée la ferait disparaître du plan : on garde au moins
+      // un panneau dedans.
+      if (tours[a].length <= 1) continue;
       for (let i = 0; i < tours[a].length && !gagne; i++) {
         const v = tours[a][i];
-        const sansV = tours[a].filter((_, k) => k !== i);
-        const gainRetrait = cout(tours[a]) - cout(sansV);
+        const reste = tours[a].filter((_, k) => k !== i);
+        const coutReste = cout(ordreRapide(d, reste));
         for (let b = 0; b < tours.length; b++) {
           if (b === a || tours[b].length >= maxArrets) continue;
           const ins = meilleureInsertion(tours[b], v);
-          const delta = ins.cout - cout(tours[b]) - gainRetrait;
-          if (delta < -1) {
-            tours[a] = ordreExact(d, sansV);
+          const essai = [...couts];
+          essai[a] = coutReste; essai[b] = ins.cout;
+          if (objectif(essai) < obj - 1) {
+            // Les deux tournées touchées repassent par l'optimum exact.
+            tours[a] = ordreExact(d, reste);
             tours[b] = ordreExact(d, [...tours[b].slice(0, ins.pos), v, ...tours[b].slice(ins.pos)]);
-            // (les deux tournées touchées repassent par l'optimum exact)
+            couts[a] = cout(tours[a]); couts[b] = cout(tours[b]);
+            obj = objectif(couts);
             gagne = true;
             break;
           }
@@ -232,11 +261,13 @@ function ameliorer(d, tours, maxArrets) {
             for (let j = 0; j < tours[b].length; j++) {
               const na = [...tours[a]]; const nb = [...tours[b]];
               [na[i], nb[j]] = [nb[j], na[i]];
-              const avant = cout(tours[a]) + cout(tours[b]);
               // Évaluation rapide ; la résolution exacte n'a lieu qu'en cas de gain.
-              const ra = ordreRapide(d, na); const rb = ordreRapide(d, nb);
-              if (cout(ra) + cout(rb) < avant - 1) {
+              const essai = [...couts];
+              essai[a] = cout(ordreRapide(d, na)); essai[b] = cout(ordreRapide(d, nb));
+              if (objectif(essai) < obj - 1) {
                 tours[a] = ordreExact(d, na); tours[b] = ordreExact(d, nb);
+                couts[a] = cout(tours[a]); couts[b] = cout(tours[b]);
+                obj = objectif(couts);
                 gagne = true;
                 break;
               }
@@ -247,16 +278,44 @@ function ameliorer(d, tours, maxArrets) {
     }
 
     if (!gagne) break;
-    total = tours.reduce((s, t) => s + cout(t), 0);
   }
-  return { tours, total };
+  return { tours, total: couts.reduce((s, x) => s + x, 0), couts };
 }
 
 /** Tailles de paquets les plus égales possibles, toutes ≤ MAX_ARRETS. */
-function decoupage(n) {
-  const paquets = Math.ceil(n / MAX_ARRETS);
-  const base = Math.floor(n / paquets), reste = n % paquets;
-  return Array.from({ length: paquets }, (_, i) => base + (i < reste ? 1 : 0));
+/** Découpe la tournée globale en paquets de durée comparable.
+ *
+ *  Couper en parts égales en nombre de panneaux donnait, sur une même commune,
+ *  des tournées de 25 à 80 minutes : les panneaux ne sont pas répartis
+ *  régulièrement sur le terrain, et ce qui coûte du temps c'est le trajet
+ *  entre eux, pas leur nombre. On coupe donc là où la durée cumulée atteint sa
+ *  part, sans jamais dépasser `maxArrets` ni laisser un paquet vide.
+ */
+function decoupageEquilibre(global, d, maxArrets) {
+  const n = global.length;
+  const paquets = Math.ceil(n / maxArrets);
+  if (paquets <= 1) return [global];
+
+  const cumul = [0];
+  for (let i = 1; i < n; i++) cumul.push(cumul[i - 1] + d[global[i - 1]][global[i]]);
+  const cible = cumul[n - 1] / paquets;
+
+  const sortie = [];
+  let debut = 0;
+  for (let p = 1; p < paquets; p++) {
+    const restants = paquets - p;
+    const min = Math.max(debut + 1, n - restants * maxArrets);
+    const max = Math.min(n - restants, debut + maxArrets);
+    let fin = min, ecartMin = Infinity;
+    for (let k = min; k <= max; k++) {
+      const ecart = Math.abs(cumul[k - 1] - cumul[debut] - cible);
+      if (ecart < ecartMin) { ecartMin = ecart; fin = k; }
+    }
+    sortie.push(global.slice(debut, fin));
+    debut = fin;
+  }
+  sortie.push(global.slice(debut));
+  return sortie;
 }
 
 async function main() {
@@ -288,42 +347,46 @@ async function main() {
     console.log(`\n=== ${famille.toUpperCase()} — ${panneaux.length} panneaux, ${groupes.length} groupes`);
 
     const plan = [];
-    let totalAvant = 0, totalApres = 0;
+    let ecartAvant = 0, ecartApres = 0;
     for (const g of groupes) {
       const pts = panneaux.filter((p) => p.__cle === g);
       const osrm = await matriceOsrm(pts, g);
-      const d = matrice(pts, osrm);
-      const global = tourneeGlobale(d);
-      const tailles = decoupage(pts.length);
+      // Deux matrices sur les mêmes points : on optimise des durées, on
+      // enregistre des kilomètres.
+      const dm = matrice(pts, osrm?.d, (a, b) => hav(a, b));
+      const tm = osrm?.t
+        ? matrice(pts, osrm.t, (a, b) => hav(a, b) / VITESSE_SECOURS)
+        : dm.map((ligne) => ligne.map((m) => m / VITESSE_SECOURS));
 
-      let k = 0;
-      let paquets = tailles.map((t) => {
-        const p = global.slice(k, k + t);
-        k += t;
-        return ordreExact(d, p);
-      });
-      const avant = paquets.reduce((s, t) => s + longueur(d, t), 0);
-      const { tours, total } = ameliorer(d, paquets, MAX_ARRETS);
+      const global = tourneeGlobale(tm);
+      let paquets = decoupageEquilibre(global, tm, MAX_ARRETS).map((p) => ordreExact(tm, p));
+      const avant = paquets.map((t) => longueur(tm, t));
+      const { tours, couts } = ameliorer(tm, paquets, MAX_ARRETS);
       paquets = tours;
 
       const tournees = paquets.map((ordonne) => ({
         panneaux: ordonne.map((i) => pts[i]),
-        metres: longueur(d, ordonne),
+        metres: longueur(dm, ordonne),
       }));
       plan.push({ groupe: g, tournees });
-      const gain = avant > 0 ? Math.round((1 - total / avant) * 100) : 0;
+
+      const min = (s) => Math.round(s / 60);
+      const ecart = (l) => (l.length < 2 ? 0 : Math.max(...l) - Math.min(...l));
+      const km = tournees.reduce((s, t) => s + t.metres, 0) / 1000;
       console.log(
         `${g} — ${pts.length} panneaux, ${tournees.length} tournée(s)` +
-          ` [${osrm ? 'distances routières' : 'vol d’oiseau'}]` +
-          `  ${(avant / 1000).toFixed(1)} → ${(total / 1000).toFixed(1)} km` +
-          (gain > 0 ? `  (−${gain} %)` : ''),
+          ` [${osrm ? (osrm.t ? 'durées routières' : 'distances routières') : 'vol d’oiseau'}]` +
+          `  ${km.toFixed(1)} km` +
+          `  ·  ${couts.map(min).join('/')} min` +
+          (paquets.length > 1 ? `  (écart ${min(ecart(avant))} → ${min(ecart(couts))} min)` : ''),
       );
-      totalAvant += avant; totalApres += total;
+      ecartAvant += ecart(avant); ecartApres += ecart(couts);
     }
 
     console.log(
-      `TOTAL ${famille} : ${(totalAvant / 1000).toFixed(1)} → ${(totalApres / 1000).toFixed(1)} km` +
-        (totalAvant > 0 ? `  (−${Math.round((1 - totalApres / totalAvant) * 100)} %)` : ''),
+      `TOTAL ${famille} : écart cumulé entre tournées ${Math.round(ecartAvant / 60)} → ` +
+        `${Math.round(ecartApres / 60)} min` +
+        (ecartAvant > 0 ? `  (−${Math.round((1 - ecartApres / ecartAvant) * 100)} %)` : ''),
     );
 
     if (DRY) continue;
