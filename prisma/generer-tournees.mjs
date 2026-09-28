@@ -19,6 +19,8 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 const MAX_ARRETS = 10;
+/** Au-delà de ce nombre de panneaux, une commune se découpe par quartier. */
+const SEUIL_QUARTIER = 40;
 const OSRM = process.env.OSRM_URL_WALKING || 'http://127.0.0.1:5102';
 const DRY = process.argv.includes('--dry');
 const SEULEMENT = ['ville', 'circo'].filter((k) => process.argv.includes(`--${k}`));
@@ -31,17 +33,30 @@ const hav = (a, b) => {
   return 2 * 6371000 * Math.asin(Math.min(1, Math.sqrt(h)));
 };
 
-/** Matrice des distances par la route ; `null` si OSRM ne répond pas. */
-async function matriceOsrm(points) {
+/** Matrice des distances par la route ; `null` si OSRM ne répond pas.
+ *  Une matrice manquante dégrade silencieusement la qualité des tournées :
+ *  on dit toujours pourquoi, et on réessaie une fois (OSRM refuse parfois une
+ *  requête quand la précédente occupe encore tous ses threads). */
+async function matriceOsrm(points, etiquette = '') {
   if (points.length < 2) return null;
   const path = points.map((p) => `${p.lng},${p.lat}`).join(';');
-  try {
-    const r = await fetch(`${OSRM}/table/v1/driving/${path}?annotations=distance`,
-      { signal: AbortSignal.timeout(15000) });
-    const j = await r.json();
-    if (j.code !== 'Ok' || !j.distances) return null;
-    return j.distances.map((row) => row.map((v) => (typeof v === 'number' ? v : NaN)));
-  } catch { return null; }
+  for (let essai = 1; essai <= 2; essai++) {
+    try {
+      // `connection: close` : plusieurs minutes de calcul séparent deux groupes,
+      // OSRM ferme la socket entre-temps et sa réutilisation échoue sèchement.
+      const r = await fetch(`${OSRM}/table/v1/driving/${path}?annotations=distance`,
+        { headers: { connection: 'close' }, signal: AbortSignal.timeout(30000) });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.code === 'Ok' && j.distances) {
+        return j.distances.map((row) => row.map((v) => (typeof v === 'number' ? v : NaN)));
+      }
+      console.warn(`  ! OSRM ${etiquette} (${points.length} pts) : HTTP ${r.status} ${j.code ?? ''} ${j.message ?? ''}`.trimEnd());
+    } catch (e) {
+      console.warn(`  ! OSRM ${etiquette} (${points.length} pts) : ${e.name} ${e.message}`);
+    }
+    if (essai === 1) await new Promise((r) => setTimeout(r, 1500));
+  }
+  return null;
 }
 
 function matrice(points, osrm) {
@@ -115,6 +130,125 @@ function ordreExact(d, idx) {
   return meilleur.seq;
 }
 
+/**
+ * Longueur d'une tournée : somme des tronçons, sans retour au départ.
+ */
+function longueur(d, seq) {
+  let t = 0;
+  for (let i = 1; i < seq.length; i++) t += d[seq[i - 1]][seq[i]];
+  return t;
+}
+
+/**
+ * Ordre correct et rapide, pour évaluer un mouvement candidat : plus proche
+ * voisin depuis le meilleur départ, puis 2-opt. Held-Karp donnerait l'optimum
+ * mais coûte mille fois plus, et on ne l'applique qu'au mouvement retenu.
+ */
+function ordreRapide(d, idx) {
+  if (idx.length <= 2) return idx;
+  let best = null;
+  for (const depart of idx) {
+    const reste = new Set(idx);
+    reste.delete(depart);
+    const seq = [depart];
+    while (reste.size) {
+      const cur = seq[seq.length - 1];
+      let k = null, dk = Infinity;
+      for (const j of reste) if (d[cur][j] < dk) { dk = d[cur][j]; k = j; }
+      reste.delete(k); seq.push(k);
+    }
+    let m = longueur(d, seq);
+    for (let pass = 0; pass < 8; pass++) {
+      let gain = false;
+      for (let i = 0; i < seq.length - 1; i++)
+        for (let j = i + 1; j < seq.length; j++) {
+          const c = [...seq.slice(0, i), ...seq.slice(i, j + 1).reverse(), ...seq.slice(j + 1)];
+          const v = longueur(d, c);
+          if (v < m - 1e-9) { seq.splice(0, seq.length, ...c); m = v; gain = true; }
+        }
+      if (!gain) break;
+    }
+    if (!best || m < best.m) best = { seq: [...seq], m };
+  }
+  return best.seq;
+}
+
+/**
+ * Améliore le découpage en déplaçant et en échangeant des arrêts d'une tournée
+ * à l'autre. Le découpage initial (grande tournée puis tranches) est bon mais
+ * arbitraire aux frontières : deux panneaux voisins peuvent se retrouver dans
+ * deux tournées différentes. On teste donc, tant que ça progresse :
+ *   - déplacer un arrêt vers une autre tournée, à sa meilleure position ;
+ *   - échanger deux arrêts entre deux tournées.
+ * On garde le mouvement dès qu'il réduit le total, puis on réoptimise
+ * exactement les deux tournées touchées.
+ */
+function ameliorer(d, tours, maxArrets) {
+  const cout = (t) => longueur(d, t);
+  let total = tours.reduce((s, t) => s + cout(t), 0);
+
+  /** Meilleur coût d'insertion de `v` dans `t`, et position associée. */
+  const meilleureInsertion = (t, v) => {
+    let best = { cout: Infinity, pos: 0 };
+    for (let k = 0; k <= t.length; k++) {
+      const c = cout([...t.slice(0, k), v, ...t.slice(k)]);
+      if (c < best.cout) best = { cout: c, pos: k };
+    }
+    return best;
+  };
+
+  for (let passe = 0; passe < 30; passe++) {
+    let gagne = false;
+
+    // Déplacements
+    for (let a = 0; a < tours.length && !gagne; a++) {
+      for (let i = 0; i < tours[a].length && !gagne; i++) {
+        const v = tours[a][i];
+        const sansV = tours[a].filter((_, k) => k !== i);
+        const gainRetrait = cout(tours[a]) - cout(sansV);
+        for (let b = 0; b < tours.length; b++) {
+          if (b === a || tours[b].length >= maxArrets) continue;
+          const ins = meilleureInsertion(tours[b], v);
+          const delta = ins.cout - cout(tours[b]) - gainRetrait;
+          if (delta < -1) {
+            tours[a] = ordreExact(d, sansV);
+            tours[b] = ordreExact(d, [...tours[b].slice(0, ins.pos), v, ...tours[b].slice(ins.pos)]);
+            // (les deux tournées touchées repassent par l'optimum exact)
+            gagne = true;
+            break;
+          }
+        }
+      }
+    }
+
+    // Échanges
+    if (!gagne) {
+      for (let a = 0; a < tours.length && !gagne; a++) {
+        for (let b = a + 1; b < tours.length && !gagne; b++) {
+          for (let i = 0; i < tours[a].length && !gagne; i++) {
+            for (let j = 0; j < tours[b].length; j++) {
+              const na = [...tours[a]]; const nb = [...tours[b]];
+              [na[i], nb[j]] = [nb[j], na[i]];
+              const avant = cout(tours[a]) + cout(tours[b]);
+              // Évaluation rapide ; la résolution exacte n'a lieu qu'en cas de gain.
+              const ra = ordreRapide(d, na); const rb = ordreRapide(d, nb);
+              if (cout(ra) + cout(rb) < avant - 1) {
+                tours[a] = ordreExact(d, na); tours[b] = ordreExact(d, nb);
+                gagne = true;
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (!gagne) break;
+    total = tours.reduce((s, t) => s + cout(t), 0);
+  }
+  return { tours, total };
+}
+
 /** Tailles de paquets les plus égales possibles, toutes ≤ MAX_ARRETS. */
 function decoupage(n) {
   const paquets = Math.ceil(n / MAX_ARRETS);
@@ -126,33 +260,68 @@ async function main() {
   for (const famille of FAMILLES) {
     const champ = famille === 'ville' ? 'city' : 'district';
     const panneaux = await prisma.panel.findMany({ where: { [champ]: { not: null } } });
-    const groupes = [...new Set(panneaux.map((p) => p[champ]))].sort((a, b) =>
+    // Une commune de 200 panneaux ne se découpe pas d'un bloc : au-delà du
+    // seuil, c'est le quartier qui fait le groupe (Nantes, Saint-Herblain).
+    // En dessous, découper par quartier donnerait des groupes d'un ou deux
+    // panneaux, alors qu'une tournée de commune reste parfaitement tenable.
+    const parCommune = new Map();
+    for (const p of panneaux) parCommune.set(p.city, (parCommune.get(p.city) ?? 0) + 1);
+    const parQuartier = (c) => famille === 'ville' && (parCommune.get(c) ?? 0) > SEUIL_QUARTIER;
+
+    for (const p of panneaux) {
+      if (!parQuartier(p.city)) { p.__cle = p[champ]; continue; }
+      // Un panneau relevé à la main n'a pas de quartier : on le rattache à
+      // celui de son voisin le plus proche plutôt que d'en faire un groupe.
+      let q = p.quarter;
+      if (!q) {
+        const voisins = panneaux.filter((o) => o.city === p.city && o.quarter);
+        q = voisins.sort((a, b) => hav(p, a) - hav(p, b))[0]?.quarter ?? null;
+      }
+      p.__cle = q ? `${p.city} · ${q}` : p[champ];
+    }
+    const groupes = [...new Set(panneaux.map((p) => p.__cle))].sort((a, b) =>
       String(a).localeCompare(String(b), 'fr', { numeric: true }),
     );
     console.log(`\n=== ${famille.toUpperCase()} — ${panneaux.length} panneaux, ${groupes.length} groupes`);
 
     const plan = [];
+    let totalAvant = 0, totalApres = 0;
     for (const g of groupes) {
-      const pts = panneaux.filter((p) => p[champ] === g);
-      const osrm = await matriceOsrm(pts);
+      const pts = panneaux.filter((p) => p.__cle === g);
+      const osrm = await matriceOsrm(pts, g);
       const d = matrice(pts, osrm);
       const global = tourneeGlobale(d);
       const tailles = decoupage(pts.length);
 
       let k = 0;
-      const tournees = tailles.map((t) => {
-        const paquet = global.slice(k, k + t);
+      let paquets = tailles.map((t) => {
+        const p = global.slice(k, k + t);
         k += t;
-        const ordonne = ordreExact(d, paquet);
-        const metres = ordonne.slice(1).reduce((s, v, i) => s + d[ordonne[i]][v], 0);
-        return { panneaux: ordonne.map((i) => pts[i]), metres };
+        return ordreExact(d, p);
       });
+      const avant = paquets.reduce((s, t) => s + longueur(d, t), 0);
+      const { tours, total } = ameliorer(d, paquets, MAX_ARRETS);
+      paquets = tours;
+
+      const tournees = paquets.map((ordonne) => ({
+        panneaux: ordonne.map((i) => pts[i]),
+        metres: longueur(d, ordonne),
+      }));
       plan.push({ groupe: g, tournees });
+      const gain = avant > 0 ? Math.round((1 - total / avant) * 100) : 0;
       console.log(
         `${g} — ${pts.length} panneaux, ${tournees.length} tournée(s)` +
-          ` [${osrm ? 'distances routières' : 'vol d’oiseau'}]`,
+          ` [${osrm ? 'distances routières' : 'vol d’oiseau'}]` +
+          `  ${(avant / 1000).toFixed(1)} → ${(total / 1000).toFixed(1)} km` +
+          (gain > 0 ? `  (−${gain} %)` : ''),
       );
+      totalAvant += avant; totalApres += total;
     }
+
+    console.log(
+      `TOTAL ${famille} : ${(totalAvant / 1000).toFixed(1)} → ${(totalApres / 1000).toFixed(1)} km` +
+        (totalAvant > 0 ? `  (−${Math.round((1 - totalApres / totalAvant) * 100)} %)` : ''),
+    );
 
     if (DRY) continue;
 

@@ -65,6 +65,7 @@ model Panel {
   lng       Float
   city      String? // commune réelle du panneau, sert au découpage par commune
   district  String? // circonscription législative, sert au découpage par circo
+  quarter   String? // quartier (Nantes) : une commune de 200 panneaux se découpe mal d'un bloc
   stops     Stop[]
   createdAt DateTime @default(now())
 

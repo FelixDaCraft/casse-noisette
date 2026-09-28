@@ -78,6 +78,7 @@ async function main() {
     const lat = +p.geo_point_2d.lat.toFixed(6);
     const lng = +p.geo_point_2d.lon.toFixed(6);
     const commune = (p.commune || '').trim() || null;
+    const quartier = (p.quartier || '').trim() || null;
     const district = circoDe(lat, lng);
     const nom = [p.nom_voie, p.complement_adresse].filter(Boolean).join(' — ') || 'Panneau';
 
@@ -89,25 +90,30 @@ async function main() {
       reconnus++;
       // On complète sans écraser : le nom saisi à la main peut être plus parlant
       // que « Rue X — angle Rue Y », et la position relevée sur le terrain aussi.
-      if (!proche.city || !proche.district) {
+      if (!proche.city || !proche.district || (quartier && !proche.quarter)) {
         if (!DRY) {
           await prisma.panel.update({
             where: { id: proche.id },
-            data: { city: proche.city ?? commune, district: proche.district ?? district },
+            data: {
+              city: proche.city ?? commune,
+              district: proche.district ?? district,
+              quarter: proche.quarter ?? quartier,
+            },
           });
         }
         proche.city = proche.city ?? commune;
         proche.district = proche.district ?? district;
+        proche.quarter = proche.quarter ?? quartier;
         completes++;
       }
       continue;
     }
 
     if (!DRY) {
-      const cree = await prisma.panel.create({ data: { name: nom, lat, lng, city: commune, district } });
+      const cree = await prisma.panel.create({ data: { name: nom, lat, lng, city: commune, district, quarter: quartier } });
       existants.push(cree);
     } else {
-      existants.push({ id: 'dry', name: nom, lat, lng, city: commune, district });
+      existants.push({ id: 'dry', name: nom, lat, lng, city: commune, district, quarter: quartier });
     }
     crees++;
   }

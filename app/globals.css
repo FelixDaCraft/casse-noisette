@@ -313,6 +313,14 @@ button {
   border-color: var(--charbon);
   color: var(--creme);
 }
+/* Commune d'une entrée « commune · quartier » : présente, mais en retrait. */
+.lieu-mere {
+  font-weight: 500;
+  opacity: 0.55;
+}
+.lieu-mere::after {
+  content: ' · ';
+}
 
 /* ─── Groupes et cartes de tournée ──────────────────────────────────────── */
 
@@ -333,7 +341,13 @@ button {
   text-transform: uppercase;
   color: var(--violet);
 }
-.groupe h2 span {
+.groupe h2 .lieu-nom {
+  font-weight: 900;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+.groupe h2 > span:not(.lieu-nom) {
   font-weight: 600;
   color: var(--gris);
   letter-spacing: 0.02em;

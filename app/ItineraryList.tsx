@@ -14,6 +14,20 @@ const VUE: { kind: Kind; label: string }[] = [
   { kind: 'circo', label: 'Par circonscription' },
 ];
 
+/** « Nantes · Centre-ville » : la commune s'efface, le quartier reste lisible.
+ *  Les grandes communes sont découpées en quartiers, et répéter leur nom sur
+ *  quinze pastilles noie l'information utile. */
+function Lieu({ nom }: { nom: string }) {
+  const i = nom.indexOf(' · ');
+  if (i < 0) return <>{nom}</>;
+  return (
+    <>
+      <span className="lieu-mere">{nom.slice(0, i)}</span>
+      {nom.slice(i + 3)}
+    </>
+  );
+}
+
 const IconNav = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
     <polygon points="3 11 22 2 13 21 11 13 3 11" />
@@ -260,7 +274,7 @@ export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
                 className={'chip' + (commune === c ? ' actif' : '')}
                 onClick={() => setCommune(c)}
               >
-                {c}
+                <Lieu nom={c} />
               </button>
             ))}
           </div>
@@ -273,7 +287,7 @@ export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
         {groupes.map((g) => (
           <section className="groupe" key={g.city}>
             <h2>
-              {g.city}
+              <span className="lieu-nom"><Lieu nom={g.city} /></span>
               <span>
                 {g.items.length} tournée{g.items.length > 1 ? 's' : ''}
               </span>
