@@ -9,6 +9,7 @@
   /* Couleurs de la charte */
   --violet: #4c0297;
   --violet-hover: #3b0176;
+  --violet-clair: #6603c9; /* même teinte, un cran plus clair : sous-titres */
   --rouge: #d1271c;
   --rouge-hover: #b51f15;
   --creme: #fffcf4;
@@ -368,6 +369,11 @@ button {
 }
 .lieu-quartier {
   font-size: 0.85em;
+}
+/* Dans l'en-tête, le quartier s'éclaircit d'un cran ; dans les pastilles le
+   texte est charbon et le violet y jurerait. */
+.groupe h2 .lieu-quartier {
+  color: var(--violet-clair);
 }
 
 /* ─── Groupes et cartes de tournée ──────────────────────────────────────── */
