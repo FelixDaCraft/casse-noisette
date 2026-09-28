@@ -558,7 +558,13 @@ button {
 /* ─── Détail d'une tournée ──────────────────────────────────────────────── */
 
 .detail-carte {
-  position: relative;
+  /* La carte ne défile pas : elle reste en place et la feuille glisse
+     par-dessus, comme dans une appli de navigation. Le `z-index` ouvre un
+     contexte d'empilement, sans quoi les boutons posés sur la carte (z-index
+     500) resteraient à flotter au-dessus de la feuille. */
+  position: sticky;
+  top: 0;
+  z-index: 0;
   height: 46vh;
   min-height: 300px;
   max-height: 460px;
@@ -655,6 +661,9 @@ button {
   position: relative;
   z-index: 10;
   margin-top: -22px;
+  /* Assez haute pour pouvoir recouvrir toute la carte, même quand la tournée
+     ne compte qu'un ou deux panneaux et que son contenu est court. */
+  min-height: 100dvh;
   background: var(--creme);
   border-radius: var(--r-feuille) var(--r-feuille) 0 0;
   padding: 22px 18px 130px;
