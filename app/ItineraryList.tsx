@@ -15,16 +15,16 @@ const VUE: { kind: Kind; label: string }[] = [
   { kind: 'circo', label: 'Par circonscription' },
 ];
 
-/** « Nantes · Centre-ville » : la commune s'efface, le quartier reste lisible.
- *  Les grandes communes sont découpées en quartiers, et répéter leur nom sur
- *  quinze pastilles noie l'information utile. */
+/** « Nantes · Centre-ville » : la commune donne le ton, le quartier la précise
+ *  dans un corps plus petit. Les deux restent en gras, l'un pour se repérer
+ *  d'un coup d'œil dans la liste, l'autre pour savoir où l'on colle. */
 function Lieu({ nom }: { nom: string }) {
   const i = nom.indexOf(' · ');
   if (i < 0) return <>{nom}</>;
   return (
     <>
       <span className="lieu-mere">{nom.slice(0, i)}</span>
-      {nom.slice(i + 3)}
+      <span className="lieu-quartier">{nom.slice(i + 3)}</span>
     </>
   );
 }

@@ -359,13 +359,15 @@ button {
   color: var(--creme);
 }
 
-/* Commune d'une entrée « commune · quartier » : présente, mais en retrait. */
-.lieu-mere {
-  font-weight: 500;
-  opacity: 0.55;
-}
+/* Entrée « commune · quartier » : la commune au corps du titre, le quartier
+   en dessous en taille, tous deux en gras. */
 .lieu-mere::after {
   content: ' · ';
+  font-weight: 500;
+  opacity: 0.45;
+}
+.lieu-quartier {
+  font-size: 0.85em;
 }
 
 /* ─── Groupes et cartes de tournée ──────────────────────────────────────── */
