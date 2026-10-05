@@ -66,8 +66,11 @@ export default function TourneeDetail({
   onSignale: (panelId: string, e: EtatCourant) => void;
   onRetour: () => void;
 }) {
-  // Panneau dont la feuille de signalement est ouverte (indice dans `panels`).
-  const [aSignaler, setASignaler] = useState<number | null>(null);
+  // Panneau dont la feuille de signalement est ouverte. Son id, pas son
+  // indice : l'ordre de passage se recalcule (position affinée, changement de
+  // mode) pendant que la feuille est ouverte, et l'indice désignerait alors un
+  // autre panneau que celui qu'on signale.
+  const [aSignaler, setASignaler] = useState<string | null>(null);
   // Panneau en cours d'envoi par le bouton « J'ai collé ».
   const [collage, setCollage] = useState<string | null>(null);
   const { toast, element: toastEl } = useToast();
@@ -154,7 +157,7 @@ export default function TourneeDetail({
       L.marker([p.lat, p.lng], { icon })
         .addTo(layer)
         .bindTooltip(e ? `${nom}<br><b>${ETAT[e.etat].libelle}</b>` : nom)
-        .on('click', () => setASignaler(i));
+        .on('click', () => setASignaler(p.id));
     });
 
     if (pos) {
@@ -172,7 +175,8 @@ export default function TourneeDetail({
   const url = gmapsUrl(panels, mode);
   const etatTournee = bilan(panels.map((p) => p.id), etats);
   const colles = panels.filter((p) => etats[p.id]?.etat === 'colle').length;
-  const enCours = aSignaler != null ? panels[aSignaler] : undefined;
+  const iEnCours = aSignaler != null ? panels.findIndex((p) => p.id === aSignaler) : -1;
+  const enCours = iEnCours >= 0 ? panels[iEnCours] : undefined;
 
   return (
     <div className="detail">
@@ -257,7 +261,7 @@ export default function TourneeDetail({
                       {IconCheck}
                       {collage === p.id ? 'Envoi…' : 'J’ai collé'}
                     </button>
-                    <button type="button" className="geste" onClick={() => setASignaler(i)}>
+                    <button type="button" className="geste" onClick={() => setASignaler(p.id)}>
                       {IconDrapeau}
                       Signaler
                     </button>
@@ -271,7 +275,7 @@ export default function TourneeDetail({
 
       {enCours && (
         <FeuilleSignalement
-          panneau={{ id: enCours.id, name: enCours.name, num: aSignaler! + 1 }}
+          panneau={{ id: enCours.id, name: enCours.name, num: iEnCours + 1 }}
           courant={etats[enCours.id]}
           maintenant={maintenant}
           onSignale={onSignale}
