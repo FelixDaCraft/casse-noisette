@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { DEP_COOKIE } from '@/lib/departements';
 import { gmapsUrl, cleanName, isAutoName, rueSeule, type Mode } from '@/lib/maps';
 import { useOptimizedOrder, type Status, type Mesure } from './useOptimizedOrder';
 import { useFavoris } from './useFavoris';
@@ -112,26 +113,63 @@ const duree = (s: number) =>
     ? `≈ ${Math.max(1, Math.round(s / 60))} min`
     : `≈ ${Math.floor(s / 3600)} h ${String(Math.round((s % 3600) / 60)).padStart(2, '0')}`;
 
+const IconCarte = (
+  <svg viewBox="0 0 24 24" width={20} height={20} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <polygon points="1 6 8 3 16 6 23 3 23 18 16 21 8 18 1 21 1 6" />
+    <line x1="8" y1="3" x2="8" y2="18" />
+    <line x1="16" y1="6" x2="16" y2="21" />
+  </svg>
+);
+
+const groupeDe = (it: It) => it.city?.trim() || 'Autres';
+
 export default function ItineraryList({
   itineraries,
   moi,
+  departement,
+  initial = {},
 }: {
+  /** Les tournées d'un seul département : la page ne charge que celui-là. */
   itineraries: It[];
   moi: { nom: string; image: string | null };
+  departement: { code: string; nom: string };
+  /** Vue et commune demandées par l'URL (résultat de recherche). */
+  initial?: { vue?: Kind; lieu?: string };
 }) {
   // Le collage urbain se fait à pied : c'est le mode par défaut de la charte.
   const [mode, setMode] = useState<Mode>('walking');
-  const [vue, setVue] = useState<Kind>(
-    itineraries.some((it) => it.kind === 'ville') ? 'ville' : 'circo',
+  const [vue, setVue] = useState<Kind>(() => {
+    if (initial.vue && itineraries.some((it) => it.kind === initial.vue)) return initial.vue;
+    return itineraries.some((it) => it.kind === 'ville') ? 'ville' : 'circo';
+  });
+  // Une commune inconnue dans cette vue viderait la liste : on l'ignore.
+  const [commune, setCommune] = useState<string | null>(() =>
+    initial.lieu && itineraries.some((it) => it.kind === vue && groupeDe(it) === initial.lieu)
+      ? initial.lieu
+      : null,
   );
-  const [commune, setCommune] = useState<string | null>(null);
+
+  // Le département affiché devient celui de l'appareil : rouvrir l'appli
+  // ramène ici, même sans paramètre dans l'adresse (écran d'accueil de la PWA).
+  useEffect(() => {
+    document.cookie = `${DEP_COOKIE}=${encodeURIComponent(departement.code)}; path=/; max-age=31536000; samesite=lax`;
+  }, [departement.code]);
+
+  // Arrivé par la recherche sur une commune : sa pastille peut être loin à
+  // droite dans la rangée, on l'amène sous les yeux.
+  useEffect(() => {
+    if (initial.lieu) document.querySelector('.chips .chip.actif')?.scrollIntoView({ block: 'nearest', inline: 'center' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const { favoris, basculer } = useFavoris();
 
   const duVue = useMemo(() => itineraries.filter((it) => it.kind === vue), [itineraries, vue]);
-  // Une commune et une circonscription peuvent porter le même nom : le favori
-  // retient donc aussi l'onglet d'où il vient.
-  const estFavori = (nom: string) => favoris.includes(`${vue}:${nom}`);
+  // Une commune et une circonscription peuvent porter le même nom, et « 4ème
+  // circonscription » existe dans chaque département : le favori retient donc
+  // aussi l'onglet et le département d'où il vient.
+  const cleFavori = (nom: string) => `${departement.code}:${vue}:${nom}`;
+  const estFavori = (nom: string) => favoris.includes(cleFavori(nom));
   // « numeric » pour que 10ème circonscription ne passe pas avant la 1ère.
   const ordreGroupe = (a: string, b: string) => a.localeCompare(b, 'fr', { numeric: true });
   // Les secteurs mis en favori remontent en tête : on ouvre l'app sur le sien.
@@ -298,6 +336,20 @@ export default function ItineraryList({
       </div>
 
       <div style={{ padding: '22px 16px 0' }}>
+        <Link href="/carte" className="dep-choix">
+          <span className="tournee-num dep-code">{departement.code}</span>
+          <span className="tournee-txt">
+            <span className="tournee-titre">{departement.nom}</span>
+            <span className="tournee-meta">
+              {itineraries.length} tournée{itineraries.length > 1 ? 's' : ''}
+            </span>
+          </span>
+          <span className="dep-choix-action">
+            {IconCarte}
+            Changer
+          </span>
+        </Link>
+
         <div className="vues" role="tablist">
           {VUE.filter((v) => compte(v.kind) > 0).map((v) => (
             <button
@@ -351,7 +403,7 @@ export default function ItineraryList({
               </span>
               <button
                 className={'fav' + (estFavori(g.city) ? ' actif' : '')}
-                onClick={() => basculer(`${vue}:${g.city}`)}
+                onClick={() => basculer(cleFavori(g.city))}
                 aria-pressed={estFavori(g.city)}
                 title={estFavori(g.city) ? 'Retirer des favoris' : 'Mettre en favori'}
               >

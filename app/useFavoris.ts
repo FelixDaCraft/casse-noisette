@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 const CLE = 'cn:favoris';
 
 /** Communes et circonscriptions mises de côté, retenues par l'appareil.
+ *  Clé : « département:vue:nom », par exemple « 44:ville:Rezé ».
  *
  *  Pas de compte à créer : un militant colle presque toujours sur les mêmes
  *  secteurs, et le navigateur suffit à s'en souvenir. Le revers assumé est
@@ -17,7 +18,15 @@ export function useFavoris() {
   useEffect(() => {
     try {
       const lu = JSON.parse(localStorage.getItem(CLE) ?? '[]');
-      if (Array.isArray(lu)) setFavoris(lu.filter((x) => typeof x === 'string'));
+      if (Array.isArray(lu))
+        setFavoris(
+          lu
+            .filter((x) => typeof x === 'string')
+            // Avant le passage à toute la France, la clé ne portait pas de
+            // département (« circo:4ème circonscription ») : tout était en
+            // Loire-Atlantique.
+            .map((x) => (/^(ville|circo):/.test(x) ? `44:${x}` : x)),
+        );
     } catch {
       /* navigation privée ou stockage refusé : on reste sans favoris */
     }

@@ -37,10 +37,10 @@ export default function AuthShell({
           </h1>
           <p className="prose">
             {texte ??
-              'Prépare les tournées de collage de l’agglomération nantaise : communes, circonscriptions, panneaux, ordre de passage.'}
+              'Prépare les tournées de collage, département par département : communes, circonscriptions, panneaux, ordre de passage.'}
           </p>
         </div>
-        <span className="auth-circo">{pied ?? 'Agglomération nantaise · Loire-Atlantique'}</span>
+        <span className="auth-circo">{pied ?? 'Toute la France · métropole et outre-mer'}</span>
       </div>
       <div className="auth-droite">
         <div className="auth-form">{children}</div>

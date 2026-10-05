@@ -40,3 +40,14 @@ export function departementDuCodePostal(cp?: string | null): string | null {
   if (cp.startsWith('20')) return Number(cp) < 20200 ? '2A' : '2B';
   return cp.slice(0, 2);
 }
+
+/** Code reconnu, sinon null : un paramètre d'URL ou un cookie se falsifient. */
+export function codeDepartement(c?: string | null): string | null {
+  const v = c?.trim().toUpperCase();
+  return v && Object.hasOwn(DEPARTEMENTS, v) ? v : null;
+}
+
+/** Dernier département consulté, retenu par l'appareil (un an). Lu par la
+ *  page d'accueil quand l'URL n'en donne pas ; à défaut, c'est celui du
+ *  militant. Pas httpOnly : c'est l'interface qui l'écrit. */
+export const DEP_COOKIE = 'cn_dep';

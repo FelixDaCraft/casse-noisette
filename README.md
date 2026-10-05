@@ -2,7 +2,7 @@
 
 # 🥜 Casse-Noisette
 
-### Itinéraires de collage — agglomération nantaise
+### Itinéraires de collage — toute la France, département par département
 
 Application web pour **gérer** et **suivre sur le terrain** les itinéraires de collage d'affiches :
 une page publique qui ouvre la navigation GPS d'un clic, et un backoffice complet pour
@@ -38,6 +38,12 @@ lance directement en navigation GPS, plus un vrai outil de gestion derrière.
   connexion ; place réservée à « Mon activité ».
 
 ### 🌍 Tournées (`/`, militants connectés)
+- 🇫🇷 **Un département à la fois** — la page ne charge que les tournées du département
+  choisi (`/?dep=44`), sinon du dernier consulté sur l'appareil (cookie `cn_dep`), sinon
+  de celui du militant. Un département sans tournée ouvre la carte avec un message.
+- 🗺️ **Carte de France** (`/carte`) — SVG cliquable, métropole + encarts outre-mer et
+  Paris/petite couronne ; départements avec tournées en violet, compteurs au toucher.
+  Recherche texte (commune, quartier, circonscription, département, code).
 - 🧭 **Ordre de passage adapté au point de départ** — les panneaux sont réordonnés
   automatiquement pour que le trajet soit le plus court **depuis là où tu te trouves**,
   sur les **distances réelles par la route** (à pied / vélo / voiture).
@@ -119,11 +125,14 @@ lance directement en navigation GPS, plus un vrai outil de gestion derrière.
 Admin ──< PasswordReset
   id, email (unique), passwordHash (scrypt), active
 
-Itinerary ──< Panel
-  id, name, position                 (ordre d'affichage)
+Itinerary ──< Stop >── Panel
+  Itinerary  id, name, city (groupe), kind (ville|circo), department, position
+  Stop       itineraryId, panelId, position        (max 10 / itinéraire)
+  Panel      id, name, lat, lng, city, district, quarter, department
 
-Panel
-  id, name, lat, lng, position, itineraryId   (max 10 / itinéraire)
+  department = code INSEE (« 44 », « 2A », « 974 ») ; `city` d'une tournée
+  (« 4ème circonscription », « Nantes · Centre-ville ») n'est unique qu'au sein
+  de son département.
 
 PasswordReset
   id, adminId, tokenHash, expiresAt, usedAt   (usage unique, 1 h)
@@ -296,6 +305,7 @@ git push origin main
         ├─ docker build                (image standalone)
         ├─ docker compose up -d db
         ├─ prisma db push + seed       (depuis le runner)
+        ├─ renseigner-departements     (idempotent, sort aussitôt si rien à faire)
         ├─ docker compose up -d web
         └─ healthcheck /api/health
 ```
@@ -340,3 +350,17 @@ git push origin main
 - 🧩 `prisma db push` (pas de fichiers de migration), comme un `drizzle-kit push`.
 - 📂 Le dossier `public/` doit exister (sinon le `COPY` du Dockerfile échoue).
 - 🔁 Les **artefacts générés** (`site/`, `.next/`, `node_modules/`) ne sont pas versionnés.
+
+### 🇫🇷 Départements et carte de France
+
+```bash
+node prisma/renseigner-departements.mjs [--dry] [--tout]   # département des panneaux puis des tournées
+node prisma/generer-tournees.mjs [--ville] [--circo] [--dep=44]   # groupes propres à chaque département
+node scripts/generer-carte-france.mjs                      # régénère app/carteFrance.json (Etalab, ODbL)
+```
+
+- Les panneaux sont rattachés par point-dans-polygone sur les contours des
+  circonscriptions (data.gouv, codes `ZA…ZS` convertis en `971…975`). Une tournée prend
+  le département de la majorité de ses panneaux.
+- Depuis le backoffice, un panneau créé ou déplacé reçoit son département via
+  `geo.api.gouv.fr` (repli : son plus proche voisin connu), puis ses tournées sont recalées.

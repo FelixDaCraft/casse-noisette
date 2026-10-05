@@ -564,6 +564,258 @@ button {
   font-size: 15px;
 }
 
+/* ─── Département : carte de France et recherche ────────────────────────── */
+
+/* Rappel du département affiché, au-dessus des onglets. Toute la ligne mène à
+   la carte : c'est là qu'on change de département ou qu'on cherche. */
+.dep-choix {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding: 8px 12px 8px 8px;
+  background: var(--blanc);
+  border-radius: var(--r-carte);
+  border: 1px solid var(--bord-carte);
+  box-shadow: var(--ombre-carte);
+  color: var(--charbon);
+  text-decoration: none;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.dep-choix:hover {
+  color: var(--charbon);
+  box-shadow: var(--ombre-carte-survol);
+  transform: translateY(-1px);
+}
+.dep-choix:active {
+  background: #f6f1fb;
+}
+.dep-choix-action {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: var(--pill);
+  background: var(--violet-10);
+  color: var(--violet);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.dep-choix-action svg {
+  width: 16px;
+  height: 16px;
+}
+/* « 974 » doit tenir dans le carré de 40px qui porte d'habitude un numéro. */
+.dep-code {
+  font-size: 15px;
+  letter-spacing: -0.02em;
+}
+.dep-code.eteint {
+  background: var(--bord-carte);
+  color: var(--gris);
+}
+
+/* Recherche : barre blanche flottante qui remonte sur le bandeau, comme le
+   sélecteur de mode, et reste en haut pendant qu'on fait défiler. */
+.recherche-barre {
+  position: sticky;
+  top: 10px;
+  z-index: 20;
+  margin: -44px 14px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 58px;
+  padding: 0 8px 0 16px;
+  background: var(--blanc);
+  border-radius: var(--r-carte-lg);
+  box-shadow: var(--ombre-barre);
+  color: var(--violet);
+}
+.recherche-barre:focus-within {
+  box-shadow: var(--ombre-barre), 0 0 0 3px var(--violet-12);
+}
+.recherche-barre input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  /* 16px : en dessous, iOS zoome la page à la saisie. */
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--charbon);
+}
+.recherche-barre input::placeholder {
+  color: var(--gris);
+  font-weight: 500;
+}
+.recherche-barre input::-webkit-search-cancel-button {
+  display: none;
+}
+.recherche-efface {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--gris);
+  cursor: pointer;
+}
+.recherche-efface:hover {
+  background: #f6f1fb;
+  color: var(--violet);
+}
+
+/* Département demandé sans tournée : on le dit avant de montrer la carte. */
+.dep-vide {
+  margin-top: 22px;
+  padding: 18px 18px 16px;
+  background: var(--blanc);
+  border-radius: var(--r-carte);
+  border: 1px solid var(--bord-carte);
+  box-shadow: var(--ombre-carte);
+}
+.dep-vide h2 {
+  margin: 6px 0 8px;
+  font-weight: 900;
+  font-size: 22px;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+.dep-vide p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--gris);
+  text-wrap: pretty;
+}
+
+/* La carte, dans une carte blanche comme les tournées. */
+.carte-france {
+  margin-top: 22px;
+  padding: 12px 12px 14px;
+  background: var(--blanc);
+  border-radius: var(--r-carte-lg);
+  border: 1px solid var(--bord-carte);
+  box-shadow: var(--ombre-carte);
+}
+.carte-france-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* Le toucher sélectionne : pas de surbrillance grise du navigateur. */
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+.carte-france-svg .encart {
+  fill: var(--creme);
+  stroke: var(--bord-carte);
+  stroke-width: 1.5;
+}
+.carte-france-svg .encart-libelle {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  /* Unités de la carte (1000 de large) : ≈ 8px sur un téléphone. */
+  font-size: 22px;
+  font-weight: 800;
+  fill: var(--gris);
+}
+.dep {
+  fill: var(--bord-champ);
+  stroke: var(--blanc);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+  cursor: pointer;
+  outline: none;
+  transition: fill 0.15s;
+}
+.dep.avec {
+  fill: var(--violet);
+}
+.dep.survol,
+.dep:focus-visible {
+  fill: var(--violet-18);
+}
+.dep.avec.survol,
+.dep.avec:focus-visible {
+  fill: var(--violet-clair);
+}
+.dep.moi {
+  stroke: var(--rouge);
+  stroke-width: 3;
+}
+.dep.choisi {
+  fill: var(--rouge);
+  stroke: var(--charbon);
+  stroke-width: 2;
+}
+
+/* Ce qu'on vient de toucher (ou de survoler), sous la carte. */
+.dep-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  margin-top: 10px;
+  padding: 8px 8px 8px 14px;
+  border-radius: var(--r-champ);
+  background: #f6f1fb;
+}
+.dep-info-txt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dep-info-nom {
+  font-weight: 900;
+  font-size: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dep-info-code {
+  margin-left: 4px;
+  font-weight: 700;
+  color: var(--violet);
+}
+.dep-info-meta {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gris);
+}
+.dep-info-go {
+  flex: none;
+  height: 40px;
+  padding: 0 18px;
+}
+.legende-carte {
+  gap: 16px;
+  margin: 12px 2px 0;
+}
+.pastille {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  background: var(--bord-champ);
+}
+.pastille.avec {
+  background: var(--violet);
+}
+.pastille.moi {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--rouge);
+}
+
 /* ─── Détail d'une tournée ──────────────────────────────────────────────── */
 
 .detail-carte {

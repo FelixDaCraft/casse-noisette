@@ -20,9 +20,9 @@ const gowun = Gowun_Batang({
 });
 
 export const metadata: Metadata = {
-  title: 'Collage — agglomération nantaise',
-  description: 'Itinéraires de collage — panneaux d’affichage libre de l’agglomération nantaise',
-  manifest: '/manifest.webmanifest?v=3',
+  title: 'Casse-Noisette — collage militant',
+  description: 'Tournées de collage des militants insoumis — panneaux d’affichage libre, département par département',
+  manifest: '/manifest.webmanifest?v=4',
   icons: {
     icon: [
       { url: '/favicon.ico?v=3', sizes: 'any' },
