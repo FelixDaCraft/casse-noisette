@@ -57,6 +57,19 @@ lance directement en navigation GPS, plus un vrai outil de gestion derrière.
   courant est le dernier signalement. Anti-abus : pas deux signalements du même panneau
   par le même militant en moins de 10 min (sauf « collé » juste après un autre état),
   30 max par 5 min.
+- 🏆 **Points, badges et classement** (`/classement`, et le profil) — les points ne sont
+  stockés nulle part : ils se recalculent des signalements, selon un barème unique et
+  documenté (`lib/points.ts`). Panneau collé +10, constat +3 (un « collé » sur une
+  affiche encore en place depuis moins de 7 j est une vérification : +3), tournée
+  complète (tous ses panneaux « collé » par le même militant en moins de 6 h, dont la
+  moitié vraiment collés) +20 et +5 par panneau. Anti-triche : un même panneau ne
+  rapporte qu'une fois par 24 h, rien pour un signalement à moins de 45 s d'un autre
+  panneau, 400 points max par jour. 6 niveaux, 8 badges (première tournée, 10/50/100
+  affiches, vigie antifasciste, couche-tard, gardien·ne de panneau, brigade).
+  Classements par groupe d'action et par département, individuels seulement **au sein
+  de son groupe et de son département** (« Prénom N. »), jamais nationaux ; périodes
+  semaine / mois / campagne. Petite récompense animée après un collage (immobile avec
+  `prefers-reduced-motion`).
 - 🗺️ **Google Maps** — itinéraire multi-arrêts + **lancement direct du GPS** (`dir_action=navigate`), toujours depuis la position de l'utilisateur.
 - 📨 **Partage Telegram** par itinéraire.
 - 🚶🚲🚗 Sélecteur de mode + option « depuis ma position ».
@@ -159,6 +172,8 @@ Panel ──< Report >── Militant
   Report      panelId, militantId? (SetNull), status, comment?, createdAt
   status      colle | recouvert | arrache | tague | vide | absent
   L'état courant d'un panneau = son dernier Report (DISTINCT ON, lib/signalements.ts).
+  Points, niveaux et badges : aucune table, recalculés des Report (lib/points.ts,
+  chargés par lib/classement.ts, cache 1 min pour les classements).
 ```
 
 ---
@@ -228,6 +243,15 @@ npm run dev
 
 `sudo` n'est requis que parce que le compte n'est pas dans le groupe `docker`.
 `sudo ./scripts/dev-db.sh reset` recharge le dump à neuf, `stop` arrête la base.
+
+Pour que classements et profils aient l'air vivants, `prisma/generer-activite-demo.mjs`
+génère ~5 semaines de signalements réalistes (comptes simulés de Loire-Atlantique et
+militants « demo-… ») — **base de dev uniquement**, il refuse toute autre base :
+
+```bash
+node prisma/generer-activite-demo.mjs            # (re)génère, idempotent
+node prisma/generer-activite-demo.mjs --supprimer # efface tout ce qu'il a créé
+```
 
 ---
 

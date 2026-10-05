@@ -12,9 +12,9 @@
    - l'écran de connexion efface ces pages (OublierHorsLigne.tsx) ;
    - ni l'API, ni les données RSC des navigations internes ne passent par le
      cache : elles dépendent de la session. */
-const CACHE = "casse-noisette-v7";
+const CACHE = "casse-noisette-v8";
 // "/" garde le dernier département consulté (/?dep=… est rangé sous "/").
-const HORS_LIGNE = ["/", "/carte", "/profil"];
+const HORS_LIGNE = ["/", "/carte", "/profil", "/classement"];
 const SHELL = [
   "/manifest.webmanifest?v=4",
   "/icon-192.png?v=3",

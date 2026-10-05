@@ -9,6 +9,7 @@ import {
   type Etat,
   type EtatCourant,
 } from '@/lib/etatsPanneau';
+import type { Recompense } from '@/lib/classement';
 import { signalerPanneau } from './actions';
 
 /** id de panneau -> état courant. Un panneau jamais signalé n'y figure pas. */
@@ -53,17 +54,20 @@ export function LigneEtat({ courant, maintenant }: { courant?: EtatCourant; main
   );
 }
 
-/** Envoie un signalement ; renvoie un message d'erreur, ou null si c'est fait. */
+/** Envoie un signalement ; renvoie un message d'erreur, ou null si c'est fait.
+ *  `onRecompense` reçoit ce qu'il a rapporté (points, tournée, badges). */
 export async function envoyerSignalement(
   panelId: string,
   etat: Etat,
   commentaire: string | undefined,
   onSignale: (panelId: string, e: EtatCourant) => void,
+  onRecompense?: (r: Recompense | null, etat: Etat) => void,
 ): Promise<string | null> {
   try {
     const r = await signalerPanneau(panelId, etat, commentaire);
     if (!r.ok) return r.erreur;
     onSignale(panelId, r.etat);
+    onRecompense?.(r.recompense, etat);
     return null;
   } catch {
     // Sur le terrain, c'est presque toujours le réseau.
@@ -81,12 +85,14 @@ export function FeuilleSignalement({
   courant,
   maintenant,
   onSignale,
+  onRecompense,
   onFermer,
 }: {
   panneau: { id: string; name: string; num: number };
   courant?: EtatCourant;
   maintenant: number;
   onSignale: (panelId: string, e: EtatCourant) => void;
+  onRecompense?: (r: Recompense | null, etat: Etat) => void;
   onFermer: () => void;
 }) {
   const [choix, setChoix] = useState<Etat | null>(null);
@@ -106,7 +112,7 @@ export function FeuilleSignalement({
     if (!choix) return;
     setErreur(null);
     demarrer(async () => {
-      const err = await envoyerSignalement(panneau.id, choix, commentaire, onSignale);
+      const err = await envoyerSignalement(panneau.id, choix, commentaire, onSignale, onRecompense);
       if (err) setErreur(err);
       else onFermer();
     });

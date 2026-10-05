@@ -5,6 +5,7 @@ import { gmapsUrl, telegramUrl, type Mode } from '@/lib/maps';
 import { A_REPASSER, ETAT, type EtatCourant } from '@/lib/etatsPanneau';
 import type { Mesure } from './useOptimizedOrder';
 import { useToast } from './admin/Toast';
+import { useRecompense } from './Recompense';
 import { FeuilleSignalement, LigneEtat, bilan, envoyerSignalement, type Etats } from './Signalement';
 
 type Panel = { id: string; name: string; lat: number; lng: number };
@@ -70,12 +71,15 @@ export default function TourneeDetail({
   // Panneau en cours d'envoi par le bouton « J'ai collé ».
   const [collage, setCollage] = useState<string | null>(null);
   const { toast, element: toastEl } = useToast();
+  const { montrer, element: recompenseEl } = useRecompense(toast);
 
   const jaiColle = async (p: Panel) => {
     setCollage(p.id);
-    const err = await envoyerSignalement(p.id, 'colle', undefined, onSignale);
+    const err = await envoyerSignalement(p.id, 'colle', undefined, onSignale, (r) =>
+      montrer(r, true, 'Merci ! Panneau marqué collé.'),
+    );
     setCollage(null);
-    toast(err ?? 'Merci ! Panneau marqué collé.');
+    if (err) toast(err);
   };
 
   const mapEl = useRef<HTMLDivElement>(null);
@@ -270,14 +274,18 @@ export default function TourneeDetail({
           panneau={{ id: enCours.id, name: enCours.name, num: aSignaler! + 1 }}
           courant={etats[enCours.id]}
           maintenant={maintenant}
-          onSignale={(id, e) => {
-            onSignale(id, e);
-            toast(A_REPASSER.has(e.etat) ? 'Signalé : le panneau est à repasser.' : 'Merci, c’est noté.');
-          }}
+          onSignale={onSignale}
+          onRecompense={(r, etat) =>
+            montrer(
+              r,
+              etat === 'colle',
+              A_REPASSER.has(etat) ? 'Signalé : le panneau est à repasser.' : 'Merci, c’est noté.',
+            )
+          }
           onFermer={() => setASignaler(null)}
         />
       )}
-      {toastEl}
+      {recompenseEl ?? toastEl}
 
       <div className="cta-zone">
         <div className="cta-inner">

@@ -8,19 +8,23 @@ import {
   type EtatCourant,
 } from '@/lib/etatsPanneau';
 import { nomCourt } from '@/lib/signalements';
+import { recompenseDe, type Recompense } from '@/lib/classement';
 
 /** Au-delà, on soupçonne un script ou un doigt qui s'emballe : même en tournée
  *  à vélo, personne ne constate 30 panneaux en 5 minutes. */
 const MAX_PAR_FENETRE = 30;
 const FENETRE_MS = 5 * 60 * 1000;
 
-export type ResultatSignalement = { ok: true; etat: EtatCourant } | { ok: false; erreur: string };
+export type ResultatSignalement =
+  | { ok: true; etat: EtatCourant; recompense: Recompense | null }
+  | { ok: false; erreur: string };
 
 /**
  * Signale l'état d'un panneau. Tout est revérifié ici, rien n'est cru du
  * client : session militant, état parmi ceux prévus, panneau existant,
  * commentaire raisonnable, et délai entre deux signalements du même panneau.
- * Renvoie le nouvel état courant pour que l'écran se mette à jour sans recharger.
+ * Renvoie le nouvel état courant pour que l'écran se mette à jour sans
+ * recharger, et ce que le signalement rapporte (points, tournée, badges).
  */
 export async function signalerPanneau(
   panelId: unknown,
@@ -73,11 +77,17 @@ export async function signalerPanneau(
     data: { panelId, militantId: militant.id, status: etat, comment },
   });
 
+  // Points recalculés depuis l'historique, comme partout ailleurs : ce qui
+  // s'affiche ici est exactement ce que comptera le classement. Un échec du
+  // calcul ne doit pas faire croire que le signalement est perdu.
+  const recompense = await recompenseDe(militant.id, r.id).catch(() => null);
+
   // Pas de revalidatePath : il ferait recalculer toute la page d'accueil dans
   // la réponse. La liste se met à jour avec la valeur renvoyée ; le profil et
   // le backoffice, dynamiques, sont de toute façon rendus à chaque visite.
   return {
     ok: true,
     etat: { etat, date: r.createdAt.toISOString(), par: nomCourt(militant), commentaire: comment },
+    recompense,
   };
 }

@@ -5,7 +5,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { DEPARTEMENTS } from '@/lib/departements';
 import type { LieuIndex, StatsDep } from '@/lib/indexFrance';
 import Marque, { DuoVioletDef } from './Marque';
-import Avatar from './Avatar';
+import HdMoi from './HdMoi';
 import CarteFrance, { pluriel } from './CarteFrance';
 
 /* Choix du département : carte de France et recherche.
@@ -142,10 +142,7 @@ export default function ChoixDepartement({
           )}
           <Marque size={40} />
           <span className="hd-nom">Casse-Noisette</span>
-          <Link href="/profil" className="hd-moi" title="Mon profil">
-            <Avatar nom={moi.nom} image={moi.image} className="avatar avatar-sm" />
-            <span className="sr">Mon profil</span>
-          </Link>
+          <HdMoi nom={moi.nom} image={moi.image} />
         </div>
         <h1>
           Choisis ton <em>département</em>

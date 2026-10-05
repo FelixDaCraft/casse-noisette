@@ -7,7 +7,7 @@ import { useOptimizedOrder, type Status, type Mesure } from './useOptimizedOrder
 import { useFavoris } from './useFavoris';
 import Marque, { DuoVioletDef } from './Marque';
 import TourneeDetail, { type NoteOrdre } from './TourneeDetail';
-import Avatar from './Avatar';
+import HdMoi from './HdMoi';
 import { fraicheur, type EtatCourant } from '@/lib/etatsPanneau';
 import { bilan, type Etats } from './Signalement';
 
@@ -344,10 +344,7 @@ export default function ItineraryList({
         <div className="hd-marque">
           <Marque size={40} />
           <span className="hd-nom">Casse-Noisette</span>
-          <Link href="/profil" className="hd-moi" title="Mon profil">
-            <Avatar nom={moi.nom} image={moi.image} className="avatar avatar-sm" />
-            <span className="sr">Mon profil</span>
-          </Link>
+          <HdMoi nom={moi.nom} image={moi.image} />
         </div>
         <h1>
           On colle où <em>aujourd’hui&nbsp;?</em>
