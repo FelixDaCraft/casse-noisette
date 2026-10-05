@@ -8,15 +8,17 @@
 # Durée : ~5 à 15 min selon la machine. Espace : ~1,5 Go au total.
 # Le découpage par zone (BBOX) est ce qui garde le traitement léger : inutile de
 # préparer toute la région Pays de la Loire pour des itinéraires de collage
-# autour de Nantes.
+# en Loire-Atlantique.
 
 set -euo pipefail
 cd "$(dirname "$0")"
 
 REGION_URL="${REGION_URL:-https://download.geofabrik.de/europe/france/pays-de-la-loire-latest.osm.pbf}"
-# Agglomération nantaise large : couvre la 4ᵉ circo et de quoi arriver de loin.
+# Toute la Loire-Atlantique : Saint-Nazaire et la presqu'île sont hors de
+# l'agglomération nantaise, et un point hors zone est rattaché en silence à la
+# route la plus proche, ce qui fausse les durées sans rien signaler.
 # Format : ouest,sud,est,nord
-BBOX="${BBOX:--2.05,46.98,-1.18,47.46}"
+BBOX="${BBOX:--2.65,46.85,-0.90,47.85}"
 IMAGE="${IMAGE:-ghcr.io/project-osrm/osrm-backend:latest}"
 
 mkdir -p data
