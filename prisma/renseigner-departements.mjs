@@ -55,7 +55,18 @@ async function main() {
     if (!p && !t) { console.log('Départements : rien à renseigner.'); return; }
   }
   console.log('Téléchargement des contours des circonscriptions…');
-  const circo = await fetch(SRC_CIRCO).then((r) => r.json());
+  // data.gouv indisponible : on le dit et on sort sans erreur. Le script tourne
+  // dans le déploiement, et un site tiers en panne ne doit pas le bloquer ; les
+  // panneaux sans département seront traités au déploiement suivant.
+  let circo;
+  try {
+    const r = await fetch(SRC_CIRCO, { signal: AbortSignal.timeout(60_000) });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    circo = await r.json();
+  } catch (e) {
+    console.warn(`  ! contours indisponibles (${e.message}) : départements non renseignés cette fois-ci`);
+    return;
+  }
 
   // 559 zones : on écarte d'abord par rectangle englobant, sinon chaque
   // panneau testerait des milliers d'anneaux pour rien.
