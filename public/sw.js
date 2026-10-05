@@ -1,10 +1,20 @@
-/* Service worker — Collage agglomération nantaise
+/* Service worker — Casse-Noisette
    - HTML : réseau d'abord (contenu frais depuis le cron), cache en secours (hors-ligne)
    - Assets (icônes, polices) : cache d'abord, réseau en secours
-   Bump CACHE pour forcer le rafraîchissement du shell. */
-const CACHE = "casse-noisette-v5";
+   Bump CACHE pour forcer le rafraîchissement du shell.
+
+   Les pages sont réservées aux militants connectés :
+   - seules les pages militantes (`HORS_LIGNE`) sont gardées, chacune sous son
+     propre chemin, et seulement si le serveur les a vraiment servies (pas
+     une redirection vers la connexion) ;
+   - "/" n'est plus pré-chargé à l'installation : sans session, on aurait
+     gardé la page de connexion à sa place ;
+   - l'écran de connexion efface ces pages (OublierHorsLigne.tsx) ;
+   - ni l'API, ni les données RSC des navigations internes ne passent par le
+     cache : elles dépendent de la session. */
+const CACHE = "casse-noisette-v6";
+const HORS_LIGNE = ["/", "/profil"];
 const SHELL = [
-  "/",
   "/manifest.webmanifest?v=3",
   "/icon-192.png?v=3",
   "/icon-512.png?v=3",
@@ -36,15 +46,35 @@ self.addEventListener("fetch", (e) => {
 
   // Pages : réseau d'abord pour avoir les itinéraires à jour, cache si hors-ligne
   if (req.mode === "navigate") {
+    const garder = url.origin === location.origin && HORS_LIGNE.includes(url.pathname);
     e.respondWith(
       fetch(req)
         .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put("/", copy));
+          if (garder && res.ok && !res.redirected) {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(url.pathname, copy));
+          }
           return res;
         })
-        .catch(() => caches.match("/").then((r) => r || caches.match(req)))
+        .catch(() =>
+          caches
+            .match(garder ? url.pathname : req)
+            .then((r) => r || (garder ? caches.match("/") : undefined))
+            .then((r) => r || Response.error())
+        )
     );
+    return;
+  }
+
+  // Dépend de la session : toujours le réseau, jamais le cache.
+  if (
+    url.origin === location.origin &&
+    (url.pathname.startsWith("/api/") ||
+      url.pathname.startsWith("/connexion") ||
+      url.pathname.startsWith("/admin") ||
+      url.searchParams.has("_rsc") ||
+      req.headers.get("RSC") === "1")
+  ) {
     return;
   }
 

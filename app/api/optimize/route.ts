@@ -1,4 +1,4 @@
-// POST /api/optimize — renvoie, pour chaque itinéraire, l'ordre de passage des
+// POST /api/optimize (militant connecté) — renvoie, pour chaque itinéraire, l'ordre de passage des
 // panneaux le plus court depuis la position fournie par le navigateur.
 //
 // Passer par le serveur plutôt que d'appeler OSRM depuis le téléphone permet de
@@ -8,6 +8,7 @@
 import { NextResponse } from 'next/server';
 import { optimizeItineraries, type ItineraryInput } from '@/lib/routing';
 import { MAX_PANELS, type Mode } from '@/lib/maps';
+import { getCurrentMilitant } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,6 +26,12 @@ const isLat = (v: unknown): v is number => typeof v === 'number' && Number.isFin
 const isLng = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= 180;
 
 export async function POST(req: Request) {
+  // Réservé aux militants connectés, comme les pages : le calcul coûte, et les
+  // tournées ne sont pas publiques.
+  if (!(await getCurrentMilitant())) {
+    return NextResponse.json({ error: 'connexion requise' }, { status: 401 });
+  }
+
   let body: Body;
   try {
     body = (await req.json()) as Body;

@@ -44,6 +44,12 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-casse}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requis}@db:5432/${POSTGRES_DB:-casse_noisette}?schema=public
       SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET requis (openssl rand -hex 32)}
       NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://casse-noisette.aynn.fr}
+      SITE_URL: ${SITE_URL:-https://casse-noisette.aynn.fr}
+      # Connexion des militants par Action Populaire (voir .env.example).
+      # Sans client configuré, personne ne peut se connecter côté militant.
+      AP_CLIENT_ID: ${AP_CLIENT_ID:-}
+      AP_CLIENT_SECRET: ${AP_CLIENT_SECRET:-}
+      AP_MOCK: ${AP_MOCK:-}
       # SMTP (reset de mot de passe par email) — optionnel ; vide = pas d'envoi.
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}

@@ -1,10 +1,12 @@
 'use client';
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { gmapsUrl, cleanName, isAutoName, rueSeule, type Mode } from '@/lib/maps';
 import { useOptimizedOrder, type Status, type Mesure } from './useOptimizedOrder';
 import { useFavoris } from './useFavoris';
 import Marque, { DuoVioletDef } from './Marque';
 import TourneeDetail, { type NoteOrdre } from './TourneeDetail';
+import Avatar from './Avatar';
 
 type Panel = { name: string; lat: number; lng: number; city: string | null };
 type Kind = 'circo' | 'ville';
@@ -110,7 +112,13 @@ const duree = (s: number) =>
     ? `≈ ${Math.max(1, Math.round(s / 60))} min`
     : `≈ ${Math.floor(s / 3600)} h ${String(Math.round((s % 3600) / 60)).padStart(2, '0')}`;
 
-export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
+export default function ItineraryList({
+  itineraries,
+  moi,
+}: {
+  itineraries: It[];
+  moi: { nom: string; image: string | null };
+}) {
   // Le collage urbain se fait à pied : c'est le mode par défaut de la charte.
   const [mode, setMode] = useState<Mode>('walking');
   const [vue, setVue] = useState<Kind>(
@@ -253,6 +261,10 @@ export default function ItineraryList({ itineraries }: { itineraries: It[] }) {
         <div className="hd-marque">
           <Marque size={40} />
           <span className="hd-nom">Casse-Noisette</span>
+          <Link href="/profil" className="hd-moi" title="Mon profil">
+            <Avatar nom={moi.nom} image={moi.image} className="avatar avatar-sm" />
+            <span className="sr">Mon profil</span>
+          </Link>
         </div>
         <h1>
           On colle où <em>aujourd’hui&nbsp;?</em>

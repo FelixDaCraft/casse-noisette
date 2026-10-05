@@ -26,14 +26,25 @@ lance directement en navigation GPS, plus un vrai outil de gestion derrière.
 
 ## ✨ Fonctionnalités
 
-### 🌍 Public (`/`)
+### 🪪 Espace militant (`/connexion`, `/profil`)
+- 🔒 **Réservé aux militants FI** : sans session, toute page renvoie vers `/connexion`
+  (`middleware.ts` + `requireMilitant()` côté serveur ; `/api/optimize` répond 401).
+- 🔑 Connexion **par Action Populaire** (OAuth2 *authorization code* + PKCE, `state` anti-CSRF).
+  Le fournisseur est derrière une interface (`lib/actionPopulaire.ts`) : **simulation** hors
+  production (faux comptes, `/connexion/simulation`), vrai AP dès que le client OAuth est
+  configuré (`AP_CLIENT_ID` / `AP_CLIENT_SECRET`). Accès refusé à qui n'est membre d'aucun
+  groupe d'action (comme TokTok).
+- 👤 **Profil** : identité, département, groupes d'action et rôle, repris d'AP à chaque
+  connexion ; place réservée à « Mon activité ».
+
+### 🌍 Tournées (`/`, militants connectés)
 - 🧭 **Ordre de passage adapté au point de départ** — les panneaux sont réordonnés
   automatiquement pour que le trajet soit le plus court **depuis là où tu te trouves**,
   sur les **distances réelles par la route** (à pied / vélo / voiture).
 - 🗺️ **Google Maps** — itinéraire multi-arrêts + **lancement direct du GPS** (`dir_action=navigate`), toujours depuis la position de l'utilisateur.
 - 📨 **Partage Telegram** par itinéraire.
 - 🚶🚲🚗 Sélecteur de mode + option « depuis ma position ».
-- 💎 Design glassmorphism aux couleurs LFI (typographies *Fraunces* + *Inter*).
+- 💎 Charte LFI 2027 (violet, rouge, crème ; *Public Sans* + *Gowun Batang*).
 - 📲 **PWA** installable + **fonctionne hors-ligne** (service worker).
 
 ### 🔐 Backoffice (`/admin`)
@@ -116,6 +127,12 @@ Panel
 
 PasswordReset
   id, adminId, tokenHash, expiresAt, usedAt   (usage unique, 1 h)
+
+Militant ──< Membership >── ActionGroup
+  Militant    apId (unique), email?, firstName?, lastName?, displayName,
+              image?, department?, postalCode?, city?, active, lastLoginAt
+  ActionGroup apId (unique), name, type, department?, city?
+  Membership  role : abonne | membre | gestionnaire | animateur
 ```
 
 ---
@@ -197,6 +214,10 @@ npm run dev
 | `SESSION_SECRET` | Clé HMAC des sessions admin (`openssl rand -hex 32`) |
 | `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` | Compte admin créé au 1ᵉʳ seed |
 | `NEXT_PUBLIC_SITE_URL` | URL publique (liens dans les emails) |
+| `SITE_URL` | URL publique lue à l'exécution : `redirect_uri` de la connexion Action Populaire |
+| `AP_CLIENT_ID` / `AP_CLIENT_SECRET` | Client OAuth Action Populaire (à demander à l'équipe numérique LFI) |
+| `AP_MOCK` | `1` force la simulation (même en prod, à éviter), `0` la coupe en dev |
+| `AP_SCOPES` / `AP_BASE_URL` / `AP_*_URL` | Réglages fins du fournisseur (valeurs par défaut d'après le code d'AP) |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` | SMTP (Resend) — optionnel |
 | `MAIL_FROM` | Expéditeur des emails de reset |
 | `OSRM_URL_DRIVING` / `OSRM_URL_BICYCLING` / `OSRM_URL_WALKING` | Instance OSRM auto-hébergée, une URL par mode (voir `deploy/osrm/`) — active le mode instantané |
@@ -304,6 +325,9 @@ git push origin main
 
 - Installable (icône, écran de démarrage), **fonctionne hors-ligne** (service worker :
   réseau d'abord pour le HTML, cache d'abord pour les assets).
+- Hors-ligne **seulement pour un militant déjà connecté** : seules `/` et `/profil` sont
+  gardées, jamais une redirection vers la connexion ; l'API et les données RSC ne passent
+  pas par le cache ; l'écran de connexion efface ces pages (téléphone prêté, déconnexion).
 - Mise à jour des icônes : **cache-busting versionné** (`?v=N`) pour passer outre le cache
   Cloudflare sans purge + **bump du nom de cache** du service worker.
 

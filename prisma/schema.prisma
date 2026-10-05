@@ -1,5 +1,5 @@
 // Casse-Noisette — schéma Prisma (PostgreSQL)
-// Itinéraires de collage + panneaux + comptes admin.
+// Itinéraires de collage + panneaux + comptes admin + militants.
 
 generator client {
   provider = "prisma-client-js"
@@ -31,6 +31,64 @@ model PasswordReset {
   createdAt DateTime  @default(now())
 
   @@index([adminId])
+}
+
+/// Militant connecté via Action Populaire. Distinct d'`Admin` : l'un prépare
+/// les tournées dans le backoffice, l'autre colle sur le terrain. Le compte est
+/// créé à la première connexion et resynchronisé à chaque suivante — Action
+/// Populaire reste la source de vérité, on n'en garde qu'une copie.
+model Militant {
+  id          String       @id @default(cuid())
+  apId        String       @unique // identifiant de la personne côté Action Populaire
+  email       String? // pas exposé par l'API d'AP accessible en OAuth : souvent vide
+  firstName   String?
+  lastName    String?
+  displayName String
+  image       String?
+  department  String? // code (« 44 », « 2A », « 974 »), déduit des groupes faute de mieux
+  postalCode  String?
+  city        String?
+  active      Boolean      @default(true)
+  memberships Membership[]
+  createdAt   DateTime     @default(now())
+  lastLoginAt DateTime     @default(now())
+
+  @@index([department])
+}
+
+/// Groupe d'action Action Populaire, partagé entre ses membres.
+model ActionGroup {
+  id          String       @id @default(cuid())
+  apId        String       @unique
+  name        String
+  type        String? // L local, B thématique, F fonctionnel, D boucle départementale
+  department  String?
+  city        String?
+  memberships Membership[]
+  updatedAt   DateTime     @updatedAt
+
+  @@index([department])
+}
+
+/// Rôle d'un militant dans un groupe, calqué sur `membershipType` d'AP
+/// (5 abonné, 10 membre, 50 gestionnaire, 100 animateur).
+enum MembershipRole {
+  abonne
+  membre
+  gestionnaire
+  animateur
+}
+
+model Membership {
+  id         String         @id @default(cuid())
+  militant   Militant       @relation(fields: [militantId], references: [id], onDelete: Cascade)
+  militantId String
+  group      ActionGroup    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId    String
+  role       MembershipRole @default(membre)
+
+  @@unique([militantId, groupId])
+  @@index([groupId])
 }
 
 /// Type de tournée : héritée des législatives (traverse plusieurs communes),

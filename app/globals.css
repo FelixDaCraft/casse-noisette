@@ -1748,3 +1748,307 @@ button {
   white-space: nowrap;
   text-decoration: none;
 }
+
+/* ─── Espace militant : avatar, connexion, profil ───────────────────────── */
+
+/* Initiales sur fond violet, ou photo Action Populaire. */
+.avatar {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--violet);
+  color: var(--creme);
+  font-weight: 900;
+  font-size: 16px;
+  letter-spacing: 0.02em;
+}
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.avatar-lg {
+  width: 64px;
+  height: 64px;
+  font-size: 22px;
+}
+/* Dans le bandeau violet : pastille crème, initiales violettes. */
+.avatar-sm {
+  width: 38px;
+  height: 38px;
+  font-size: 14px;
+  background: var(--creme);
+  color: var(--violet);
+}
+.hd-moi {
+  margin-left: auto;
+  border-radius: 50%;
+  text-decoration: none;
+  box-shadow: 0 0 0 2px rgba(255, 252, 244, 0.35);
+  transition: box-shadow 0.15s, transform 0.2s;
+}
+.hd-moi:hover {
+  box-shadow: 0 0 0 3px var(--creme);
+}
+.hd-moi:active {
+  transform: scale(0.94);
+}
+
+/* Bouton de retour rond, crème translucide, dans le bandeau. */
+.hd-retour {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 252, 244, 0.12);
+  color: var(--creme);
+}
+.hd-retour:hover {
+  color: var(--creme);
+  background: rgba(255, 252, 244, 0.2);
+}
+.hd-retour:active {
+  transform: scale(0.94);
+}
+
+/* Le bouton de connexion est un lien (navigation vers AP) habillé en bouton. */
+.btn-ap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 20px;
+  text-decoration: none;
+}
+.btn-ap:hover {
+  color: var(--creme);
+}
+.note-simulation {
+  margin: 16px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--gris);
+}
+
+/* Profil : le bandeau est plus court, la carte d'identité remonte dessus
+   comme la barre des modes sur la page des tournées. */
+.hd-profil {
+  padding-bottom: 64px;
+}
+.hd-profil h1 {
+  margin-top: 22px;
+}
+.profil-carte {
+  position: relative;
+  z-index: 1;
+  margin: -44px 14px 0;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--blanc);
+  border-radius: var(--r-carte-lg);
+  box-shadow: var(--ombre-barre);
+}
+.profil-id {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.profil-nom {
+  font-weight: 900;
+  font-size: 20px;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+.profil-sous {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gris);
+}
+
+.profil-infos {
+  margin: 0;
+  background: var(--blanc);
+  border: 1px solid var(--bord-carte);
+  border-radius: var(--r-carte);
+  box-shadow: var(--ombre-carte);
+}
+.profil-infos > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 14px;
+}
+.profil-infos > div + div {
+  border-top: 1px solid var(--bord-carte);
+}
+.profil-infos dt {
+  flex: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gris);
+}
+.profil-infos dd {
+  margin: 0;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 800;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.profil-infos dd.absent {
+  font-weight: 500;
+  color: var(--gris);
+}
+
+/* Un groupe d'action : même carte blanche que les tournées. */
+.profil-ga {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--blanc);
+  border: 1px solid var(--bord-carte);
+  border-radius: var(--r-carte);
+  box-shadow: var(--ombre-carte);
+}
+.profil-ga-txt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.profil-ga-nom {
+  font-weight: 800;
+  font-size: 15px;
+  line-height: 1.25;
+}
+.profil-ga-meta {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--gris);
+}
+.profil-ga .badge {
+  flex: none;
+}
+
+/* Place réservée, en pointillés tant qu'elle est vide. */
+.profil-activite {
+  padding: 24px 18px;
+  border: 1.5px dashed var(--violet-18);
+  border-radius: var(--r-carte);
+  text-align: center;
+}
+.profil-activite p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--gris);
+}
+
+.btn-deco {
+  width: 100%;
+  color: var(--rouge);
+}
+.btn-deco:hover {
+  border-color: var(--rouge);
+  color: var(--rouge);
+  background: var(--danger-fond);
+}
+
+/* ─── Action Populaire simulée ──────────────────────────────────────────────
+   Écran de consentement factice : neutre (blanc et charbon, sans violet),
+   pour ne jamais passer pour le vrai Action Populaire ni pour l'appli. */
+
+.sim-tete {
+  padding: 28px 20px 8px;
+}
+.sim-fournisseur {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: var(--pill);
+  border: 1.5px dashed var(--bord-champ);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gris);
+}
+.sim-tete h1 {
+  margin: 18px 0 8px;
+  font-weight: 900;
+  font-size: 26px;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+}
+.sim-tete p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--gris);
+}
+.sim-scopes {
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--gris);
+}
+.sim-scopes code {
+  font-weight: 700;
+  color: var(--charbon);
+}
+.sim-compte {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--bord-carte);
+  border-radius: var(--r-carte);
+  background: var(--blanc);
+  box-shadow: var(--ombre-carte);
+  text-align: left;
+  cursor: pointer;
+  color: var(--charbon);
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.sim-compte:hover {
+  box-shadow: 0 8px 24px rgba(33, 35, 32, 0.1);
+  transform: translateY(-1px);
+}
+.sim-compte:active {
+  transform: scale(0.98);
+}
+.sim-compte .avatar {
+  background: var(--charbon);
+}
+.sim-compte-txt {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sim-compte-nom {
+  font-weight: 800;
+  font-size: 15px;
+}
+.sim-compte-meta {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--gris);
+}
