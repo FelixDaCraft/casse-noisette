@@ -78,6 +78,9 @@ jobs:
           node prisma/migrate-stops.mjs
           npx prisma db push --skip-generate
           node prisma/seed.mjs
+          # Département des panneaux et tournées : la page n'affiche que celles
+          # du département choisi. Idempotent, sort aussitôt sans rien à faire.
+          node prisma/renseigner-departements.mjs
 
       - name: Deploy app
         working-directory: /opt/casse-noisette-app

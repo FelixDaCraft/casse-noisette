@@ -8,6 +8,7 @@ import { hashPassword, verifyPassword } from '@/lib/password';
 import { sendMail } from '@/lib/mail';
 import { makeResetToken, hashResetToken } from '@/lib/reset';
 import { MAX_PANELS } from '@/lib/maps';
+import { departementDe, recalerTournees } from '@/lib/departementPanneau';
 
 function revalAll(itineraryId?: string) {
   revalidatePath('/');
@@ -172,9 +173,11 @@ export async function addPanel(itineraryId: string, lat: number, lng: number, na
       lat,
       lng,
       city: itinerary?.city ?? null,
+      department: await departementDe(lat, lng),
       stops: { create: { itineraryId, position: (max._max.position ?? -1) + 1 } },
     },
   });
+  await recalerTournees([itineraryId]);
   revalAll(itineraryId);
   return { id: panel.id, name: panel.name, lat: panel.lat, lng: panel.lng };
 }
@@ -189,6 +192,7 @@ export async function attachPanel(itineraryId: string, panelId: string) {
   await prisma.stop.create({
     data: { itineraryId, panelId, position: (max._max.position ?? -1) + 1 },
   });
+  await recalerTournees([itineraryId]);
   revalAll(itineraryId);
   return { ok: true };
 }
@@ -202,9 +206,14 @@ export async function updatePanel(
   if (typeof data.name === 'string') clean.name = data.name.trim();
   if (typeof data.lat === 'number' && Number.isFinite(data.lat)) clean.lat = data.lat;
   if (typeof data.lng === 'number' && Number.isFinite(data.lng)) clean.lng = data.lng;
-  await prisma.panel.update({ where: { id }, data: clean });
+  const p = await prisma.panel.update({ where: { id }, data: clean });
   // Le panneau peut servir dans plusieurs tournées : toutes sont concernées.
   const stops = await prisma.stop.findMany({ where: { panelId: id }, select: { itineraryId: true } });
+  // Déplacé : il a pu changer de département, et ses tournées avec lui.
+  if (clean.lat !== undefined || clean.lng !== undefined) {
+    await prisma.panel.update({ where: { id }, data: { department: await departementDe(p.lat, p.lng) } });
+    await recalerTournees(stops.map((s) => s.itineraryId));
+  }
   for (const s of stops) revalAll(s.itineraryId);
 }
 
@@ -220,6 +229,7 @@ export async function deletePanel(id: string, itineraryId?: string) {
   if (!cible) return;
   await prisma.stop.deleteMany({ where: { panelId: id, itineraryId: cible } });
   if (stops.length <= 1) await prisma.panel.delete({ where: { id } }).catch(() => undefined);
+  await recalerTournees([cible]);
   revalAll(cible);
 }
 
@@ -272,7 +282,13 @@ export async function createPanel(input: { name: string; lat: number; lng: numbe
   const dup = await findNear(input.lat, input.lng);
   if (dup) return { id: dup.id, reused: true };
   const p = await prisma.panel.create({
-    data: { name: input.name.trim() || 'Nouveau panneau', lat: input.lat, lng: input.lng, city: input.city?.trim() || null },
+    data: {
+      name: input.name.trim() || 'Nouveau panneau',
+      lat: input.lat,
+      lng: input.lng,
+      city: input.city?.trim() || null,
+      department: await departementDe(input.lat, input.lng),
+    },
   });
   revalidatePath('/admin/panels');
   return { id: p.id, reused: false };
@@ -331,6 +347,7 @@ export async function importPanels(
       attached++;
     }
   }
+  await recalerTournees([itineraryId]);
   revalidatePath('/'); revalidatePath('/admin'); revalidatePath('/admin/panels');
   if (itineraryId) revalidatePath(`/admin/itineraries/${itineraryId}`);
   return { created, reused, attached, skipped, itineraryId };

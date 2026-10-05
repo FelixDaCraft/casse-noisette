@@ -46,7 +46,8 @@ async function main() {
   for (const a of ajouts) {
     if (tous.some((q) => hav(a, q) < SEUIL_DOUBLON_M)) { ignores++; continue; }
     const cree = await prisma.panel.create({
-      data: { name: a.name, lat: a.lat, lng: a.lng, city: a.city ?? (await communeDe(a.lat, a.lng)) },
+      // Les itinéraires partagés sont tous à Rezé et alentour : Loire-Atlantique.
+      data: { name: a.name, lat: a.lat, lng: a.lng, city: a.city ?? (await communeDe(a.lat, a.lng)), department: '44' },
     });
     tous.push(cree); crees++;
   }

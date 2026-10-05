@@ -102,14 +102,20 @@ enum ItineraryKind {
 model Itinerary {
   id        String        @id @default(cuid())
   name      String
-  city      String? // commune de rattachement (regroupement dans la page)
-  kind      ItineraryKind @default(circo)
-  position  Int           @default(0)
-  stops     Stop[]
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  city       String? // commune de rattachement (regroupement dans la page)
+  /// Département (code INSEE : « 44 », « 2A », « 974 »), celui de la majorité
+  /// de ses panneaux. La page ne charge que les tournées du département choisi,
+  /// et c'est lui qui distingue la « 4ème circonscription » de Loire-Atlantique
+  /// de celle du Rhône : `city` seul n'est unique qu'au sein d'un département.
+  department String?
+  kind       ItineraryKind @default(circo)
+  position   Int           @default(0)
+  stops      Stop[]
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
 
   @@index([kind, city, position])
+  @@index([department, kind, city, position])
 }
 
 /// Un panneau d'affichage : un lieu physique, unique, indépendant des tournées.
@@ -122,13 +128,15 @@ model Panel {
   lat       Float
   lng       Float
   city      String? // commune réelle du panneau, sert au découpage par commune
-  district  String? // circonscription législative, sert au découpage par circo
-  quarter   String? // quartier (Nantes) : une commune de 200 panneaux se découpe mal d'un bloc
-  stops     Stop[]
-  createdAt DateTime @default(now())
+  district   String? // circonscription législative, sert au découpage par circo
+  quarter    String? // quartier (Nantes) : une commune de 200 panneaux se découpe mal d'un bloc
+  department String? // département (code INSEE), déduit de la position
+  stops      Stop[]
+  createdAt  DateTime @default(now())
 
   @@index([city])
   @@index([district])
+  @@index([department])
 }
 
 /// Passage d'un itinéraire par un panneau, à une position donnée.

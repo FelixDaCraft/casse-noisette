@@ -18,6 +18,7 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 const DRY = process.argv.includes('--dry');
 const SEUIL_M = 60; // un même panneau relevé à la main et par la métropole
+const DEPARTEMENT = '44'; // toute la métropole est en Loire-Atlantique
 
 const SRC_PANNEAUX =
   'https://data.nantesmetropole.fr/api/explore/v2.1/catalog/datasets/244400404_panneaux-affichage-libre-nantes-metropole/exports/json';
@@ -90,7 +91,7 @@ async function main() {
       reconnus++;
       // On complète sans écraser : le nom saisi à la main peut être plus parlant
       // que « Rue X — angle Rue Y », et la position relevée sur le terrain aussi.
-      if (!proche.city || !proche.district || (quartier && !proche.quarter)) {
+      if (!proche.city || !proche.district || !proche.department || (quartier && !proche.quarter)) {
         if (!DRY) {
           await prisma.panel.update({
             where: { id: proche.id },
@@ -98,19 +99,21 @@ async function main() {
               city: proche.city ?? commune,
               district: proche.district ?? district,
               quarter: proche.quarter ?? quartier,
+              department: proche.department ?? DEPARTEMENT,
             },
           });
         }
         proche.city = proche.city ?? commune;
         proche.district = proche.district ?? district;
         proche.quarter = proche.quarter ?? quartier;
+        proche.department = proche.department ?? DEPARTEMENT;
         completes++;
       }
       continue;
     }
 
     if (!DRY) {
-      const cree = await prisma.panel.create({ data: { name: nom, lat, lng, city: commune, district, quarter: quartier } });
+      const cree = await prisma.panel.create({ data: { name: nom, lat, lng, city: commune, district, quarter: quartier, department: DEPARTEMENT } });
       existants.push(cree);
     } else {
       existants.push({ id: 'dry', name: nom, lat, lng, city: commune, district, quarter: quartier });

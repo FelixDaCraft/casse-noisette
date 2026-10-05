@@ -3,6 +3,12 @@
 //   --circo  une famille par circonscription (kind = circo, city = la circo)
 // Sans option, les deux sont régénérées.
 //
+// Chaque groupe est propre à un département : « 4ème circonscription » existe
+// dans presque tous, et deux communes peuvent porter le même nom. Le groupe se
+// lit donc (département, nom), et chaque tournée reçoit son département — la
+// page n'affiche que celles du département choisi, où le nom seul suffit.
+//   --dep=44[,85]  ne régénère que ces départements, les autres restent tels quels
+//
 // Méthode « tourner d'abord, découper ensuite » : on calcule une grande tournée
 // optimale sur tous les panneaux de la commune, puis on la tranche en paquets
 // de 10 maximum (limite Google Maps). Les paquets sont ainsi géographiquement
@@ -18,7 +24,7 @@
 // Les durées viennent de l'instance OSRM (profil voiture). Sans OSRM
 // joignable, on retombe sur le vol d'oiseau à vitesse urbaine.
 //
-//   node prisma/generer-tournees-ville.mjs [--dry] [--ville] [--circo]
+//   node prisma/generer-tournees.mjs [--dry] [--ville] [--circo] [--dep=44]
 //
 // Relançable : seules les familles régénérées sont remplacées.
 import { PrismaClient } from '@prisma/client';
@@ -38,6 +44,7 @@ const POIDS_EQUILIBRE = 2;
 const DRY = process.argv.includes('--dry');
 const SEULEMENT = ['ville', 'circo'].filter((k) => process.argv.includes(`--${k}`));
 const FAMILLES = SEULEMENT.length ? SEULEMENT : ['ville', 'circo'];
+const DEPS = process.argv.find((a) => a.startsWith('--dep='))?.slice(6).split(',').filter(Boolean) ?? null;
 
 const rad = (d) => (d * Math.PI) / 180;
 const hav = (a, b) => {
@@ -321,36 +328,51 @@ function decoupageEquilibre(global, d, maxArrets) {
 async function main() {
   for (const famille of FAMILLES) {
     const champ = famille === 'ville' ? 'city' : 'district';
-    const panneaux = await prisma.panel.findMany({ where: { [champ]: { not: null } } });
+    const panneaux = await prisma.panel.findMany({
+      where: { [champ]: { not: null }, department: DEPS ? { in: DEPS } : { not: null } },
+    });
+    // Sans département, un panneau n'apparaîtrait dans aucune page : on le
+    // signale plutôt que de le ranger au hasard.
+    const orphelins = DEPS ? 0 : await prisma.panel.count({ where: { [champ]: { not: null }, department: null } });
+    if (orphelins)
+      console.warn(`  ! ${orphelins} panneau(x) sans département ignoré(s) : lancer prisma/renseigner-departements.mjs`);
     // Une commune de 200 panneaux ne se découpe pas d'un bloc : au-delà du
     // seuil, c'est le quartier qui fait le groupe (Nantes, Saint-Herblain).
     // En dessous, découper par quartier donnerait des groupes d'un ou deux
     // panneaux, alors qu'une tournée de commune reste parfaitement tenable.
+    const commune = (p) => `${p.department}|${p.city}`;
     const parCommune = new Map();
-    for (const p of panneaux) parCommune.set(p.city, (parCommune.get(p.city) ?? 0) + 1);
-    const parQuartier = (c) => famille === 'ville' && (parCommune.get(c) ?? 0) > SEUIL_QUARTIER;
+    for (const p of panneaux) parCommune.set(commune(p), (parCommune.get(commune(p)) ?? 0) + 1);
+    const parQuartier = (p) => famille === 'ville' && (parCommune.get(commune(p)) ?? 0) > SEUIL_QUARTIER;
 
     for (const p of panneaux) {
-      if (!parQuartier(p.city)) { p.__cle = p[champ]; continue; }
+      p.__dep = p.department;
+      if (!parQuartier(p)) { p.__nom = p[champ]; continue; }
       // Un panneau relevé à la main n'a pas de quartier : on le rattache à
       // celui de son voisin le plus proche plutôt que d'en faire un groupe.
       let q = p.quarter;
       if (!q) {
-        const voisins = panneaux.filter((o) => o.city === p.city && o.quarter);
+        const voisins = panneaux.filter((o) => commune(o) === commune(p) && o.quarter);
         q = voisins.sort((a, b) => hav(p, a) - hav(p, b))[0]?.quarter ?? null;
       }
-      p.__cle = q ? `${p.city} · ${q}` : p[champ];
+      p.__nom = q ? `${p.city} · ${q}` : p[champ];
     }
-    const groupes = [...new Set(panneaux.map((p) => p.__cle))].sort((a, b) =>
-      String(a).localeCompare(String(b), 'fr', { numeric: true }),
-    );
+    // Clé interne département|nom : le nom seul n'est unique que dans un département.
+    for (const p of panneaux) p.__cle = `${p.__dep}|${p.__nom}`;
+    const ordre = (a, b) => String(a).localeCompare(String(b), 'fr', { numeric: true });
+    const groupes = [...new Set(panneaux.map((p) => p.__cle))].sort((a, b) => {
+      const [da, na] = a.split('|'), [db, nb] = b.split('|');
+      return ordre(da, db) || ordre(na, nb);
+    });
     console.log(`\n=== ${famille.toUpperCase()} — ${panneaux.length} panneaux, ${groupes.length} groupes`);
 
     const plan = [];
     let ecartAvant = 0, ecartApres = 0;
-    for (const g of groupes) {
-      const pts = panneaux.filter((p) => p.__cle === g);
-      const osrm = await matriceOsrm(pts, g);
+    for (const cle of groupes) {
+      const pts = panneaux.filter((p) => p.__cle === cle);
+      const dep = pts[0].__dep;
+      const g = pts[0].__nom;
+      const osrm = await matriceOsrm(pts, `${dep} · ${g}`);
       // Deux matrices sur les mêmes points : on optimise des durées, on
       // enregistre des kilomètres.
       const dm = matrice(pts, osrm?.d, (a, b) => hav(a, b));
@@ -368,13 +390,13 @@ async function main() {
         panneaux: ordonne.map((i) => pts[i]),
         metres: longueur(dm, ordonne),
       }));
-      plan.push({ groupe: g, tournees });
+      plan.push({ dep, groupe: g, tournees });
 
       const min = (s) => Math.round(s / 60);
       const ecart = (l) => (l.length < 2 ? 0 : Math.max(...l) - Math.min(...l));
       const km = tournees.reduce((s, t) => s + t.metres, 0) / 1000;
       console.log(
-        `${g} — ${pts.length} panneaux, ${tournees.length} tournée(s)` +
+        `${dep} · ${g} — ${pts.length} panneaux, ${tournees.length} tournée(s)` +
           ` [${osrm ? (osrm.t ? 'durées routières' : 'distances routières') : 'vol d’oiseau'}]` +
           `  ${km.toFixed(1)} km` +
           `  ·  ${couts.map(min).join('/')} min` +
@@ -391,11 +413,13 @@ async function main() {
 
     if (DRY) continue;
 
-    const ancien = await prisma.itinerary.deleteMany({ where: { kind: famille } });
+    const ancien = await prisma.itinerary.deleteMany({
+      where: { kind: famille, ...(DEPS ? { department: { in: DEPS } } : {}) },
+    });
     if (ancien.count) console.log(`${ancien.count} tournée(s) remplacée(s)`);
 
     let pos = 0, creees = 0;
-    for (const { groupe, tournees } of plan) {
+    for (const { dep, groupe, tournees } of plan) {
       for (const t of tournees) {
         const premier = t.panneaux[0].name;
         const dernier = t.panneaux[t.panneaux.length - 1].name;
@@ -403,6 +427,7 @@ async function main() {
           data: {
             name: `Itinéraire de ${premier} à ${dernier}`,
             city: groupe,
+            department: dep,
             kind: famille,
             position: pos++,
             stops: { create: t.panneaux.map((p, i) => ({ panelId: p.id, position: i })) },

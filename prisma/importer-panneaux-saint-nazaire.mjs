@@ -18,6 +18,7 @@ const prisma = new PrismaClient();
 const DRY = process.argv.includes('--dry');
 const SEUIL_M = 60;
 const COMMUNE = 'Saint-Nazaire';
+const DEPARTEMENT = '44';
 
 const SRC_PANNEAUX =
   'https://data.agglo-carene.fr/api/explore/v2.1/catalog/datasets/214401846_panneaux_affichage/exports/json';
@@ -120,20 +121,21 @@ async function main() {
     const proche = existants.find((e) => hav({ lat, lng }, e) <= SEUIL_M);
     if (proche) {
       reconnus++;
-      if (!DRY && (!proche.city || !proche.district || !proche.quarter)) {
+      if (!DRY && (!proche.city || !proche.district || !proche.quarter || !proche.department)) {
         await prisma.panel.update({
           where: { id: proche.id },
           data: {
             city: proche.city ?? COMMUNE,
             district: proche.district ?? district,
             quarter: proche.quarter ?? quartier,
+            department: proche.department ?? DEPARTEMENT,
           },
         });
       }
       continue;
     }
 
-    if (!DRY) await prisma.panel.create({ data: { name: nom, lat, lng, city: COMMUNE, district, quarter: quartier } });
+    if (!DRY) await prisma.panel.create({ data: { name: nom, lat, lng, city: COMMUNE, district, quarter: quartier, department: DEPARTEMENT } });
     crees++;
   }
 
