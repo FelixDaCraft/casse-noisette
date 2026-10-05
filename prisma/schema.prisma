@@ -50,6 +50,7 @@ model Militant {
   city        String?
   active      Boolean      @default(true)
   memberships Membership[]
+  reports     Report[]
   createdAt   DateTime     @default(now())
   lastLoginAt DateTime     @default(now())
 
@@ -132,6 +133,7 @@ model Panel {
   quarter    String? // quartier (Nantes) : une commune de 200 panneaux se découpe mal d'un bloc
   department String? // département (code INSEE), déduit de la position
   stops      Stop[]
+  reports    Report[]
   createdAt  DateTime @default(now())
 
   @@index([city])
@@ -152,4 +154,34 @@ model Stop {
   @@unique([itineraryId, panelId])
   @@index([itineraryId, position])
   @@index([panelId])
+}
+
+/// État d'un panneau constaté sur le terrain. Les valeurs restent en français,
+/// comme `MembershipRole` : ce sont celles qu'on lit dans la base.
+enum PanelStatus {
+  colle // affiche FI en place
+  recouvert // recouvert par une autre affiche
+  arrache // arraché ou dégradé
+  tague // inscription haineuse : à photographier pour une plainte
+  vide // libre, rien dessus
+  absent // le panneau n'existe plus
+}
+
+/// Signalement de l'état d'un panneau par un militant. On garde tout
+/// l'historique : l'état courant d'un panneau est son dernier signalement,
+/// et les signalements « absent » répétés remontent au backoffice.
+model Report {
+  id         String      @id @default(cuid())
+  panel      Panel       @relation(fields: [panelId], references: [id], onDelete: Cascade)
+  panelId    String
+  /// Null si le compte du militant a été supprimé : le constat reste valable.
+  militant   Militant?   @relation(fields: [militantId], references: [id], onDelete: SetNull)
+  militantId String?
+  status     PanelStatus
+  comment    String?
+  createdAt  DateTime    @default(now())
+
+  @@index([panelId, createdAt])
+  @@index([militantId, createdAt])
+  @@index([status, panelId])
 }

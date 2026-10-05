@@ -299,6 +299,7 @@ export async function deletePanelEverywhere(id: string) {
   await requireAdmin();
   await prisma.panel.delete({ where: { id } });
   revalidatePath('/'); revalidatePath('/admin'); revalidatePath('/admin/panels');
+  revalidatePath('/admin/absents');
 }
 
 /**

@@ -2304,3 +2304,429 @@ button {
   font-weight: 500;
   color: var(--gris);
 }
+
+/* ─── Signalements : état des panneaux ──────────────────────────────────────
+   Une couleur par état, posée en variables sur la classe `etat-*` : la même
+   classe colore la pastille, le marqueur de la carte et le rond de la frise.
+   Rouge pour l'arraché (la couleur de l'alerte), charbon pour le tag haineux,
+   jaune pour le recouvert, vert pour notre affiche en place. */
+
+.etat-colle {
+  --etat: var(--succes-vif);
+  --etat-txt: #fff;
+}
+.etat-recouvert {
+  --etat: var(--geo-attente);
+  --etat-txt: var(--charbon);
+}
+.etat-arrache {
+  --etat: var(--rouge);
+  --etat-txt: #fff;
+}
+.etat-tague {
+  --etat: var(--charbon);
+  --etat-txt: #fff;
+}
+.etat-vide {
+  --etat: var(--blanc);
+  --etat-txt: var(--violet);
+}
+.etat-absent {
+  --etat: var(--gris);
+  --etat-txt: #fff;
+}
+
+.pastille-etat {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--etat, transparent);
+  box-shadow: inset 0 0 0 1.5px rgba(33, 35, 32, 0.18);
+}
+.pastille-etat.etat-inconnu {
+  box-shadow: inset 0 0 0 1.5px var(--bord-champ);
+}
+/* Vide et absent se lisent au contour, pas à la couleur. */
+.pastille-etat.etat-vide {
+  box-shadow: inset 0 0 0 2px var(--violet);
+}
+.pastille-etat.etat-absent {
+  background: repeating-linear-gradient(45deg, var(--gris) 0 2px, transparent 2px 4px);
+}
+
+/* Marqueurs de la carte et ronds de la frise : la couleur de l'état prend la
+   place du violet, le numéro de passage reste lisible. */
+.cn-marker[class*='etat-'],
+.frise-rond[class*='etat-'] {
+  background: var(--etat);
+  color: var(--etat-txt);
+}
+.cn-marker.etat-vide,
+.frise-rond.etat-vide {
+  box-shadow: inset 0 0 0 2px var(--violet), 0 0 0 3px var(--creme);
+}
+.cn-marker {
+  cursor: pointer;
+}
+
+/* « Recouvert · il y a 2 j par Camille L. » */
+.etat-ligne {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--gris);
+}
+.etat-ligne b {
+  font-weight: 800;
+  color: var(--charbon);
+}
+.etat-ligne.a-repasser b {
+  color: var(--rouge);
+}
+
+/* Liste : pastille du nombre de panneaux à repasser, âge du dernier constat. */
+.tournee-etat {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 30px;
+}
+.tournee-etat-cnt {
+  min-width: 24px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: var(--pill);
+  background: var(--rouge);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 900;
+}
+.tournee-etat-cnt.ok {
+  background: var(--succes-fond);
+  color: var(--succes-txt);
+}
+.tournee-etat-age {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--gris);
+  white-space: nowrap;
+}
+
+/* Filtre « À repasser », sous les onglets : une pilule qu'on allume. */
+.filtre-repasser {
+  margin-top: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 8px 0 14px;
+  border-radius: var(--pill);
+  border: 1.5px solid var(--bord-champ);
+  background: var(--blanc);
+  color: var(--charbon);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.filtre-repasser:hover {
+  border-color: var(--rouge);
+}
+.filtre-repasser:active {
+  transform: scale(0.97);
+}
+.filtre-repasser.actif {
+  background: var(--rouge);
+  border-color: var(--rouge);
+  color: #fff;
+}
+.filtre-repasser.actif .pastille-etat {
+  background: #fff;
+}
+.filtre-repasser .vue-cnt {
+  background: var(--danger-fond);
+  color: var(--rouge);
+}
+.filtre-repasser.actif .vue-cnt {
+  background: rgba(255, 252, 244, 0.22);
+  color: #fff;
+}
+.filtre-repasser + .chips {
+  margin-top: 10px;
+}
+
+/* Détail : résumé sous les chiffres, puis un panneau par ligne de frise avec
+   son état et deux gestes, à portée de pouce. */
+.etat-resume {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 0;
+}
+.etat-resume span {
+  padding: 3px 10px;
+  border-radius: var(--pill);
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--succes-fond);
+  color: var(--succes-txt);
+}
+.etat-resume .a-repasser {
+  background: var(--danger-fond);
+  color: var(--rouge);
+}
+
+.frise li.frise-panneau {
+  align-items: flex-start;
+  padding: 10px 0;
+}
+.frise-corps {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 5px;
+}
+.frise-gestes {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+.geste {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--pill);
+  border: 1.5px solid var(--bord-champ);
+  background: var(--blanc);
+  color: var(--charbon);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.geste:hover {
+  border-color: var(--violet);
+  color: var(--violet);
+}
+.geste:active {
+  transform: scale(0.97);
+}
+.geste[disabled] {
+  opacity: 0.6;
+  cursor: default;
+}
+.geste-colle {
+  border-color: var(--violet);
+  background: var(--violet);
+  color: var(--creme);
+}
+.geste-colle:hover {
+  background: var(--violet-hover);
+  color: var(--creme);
+}
+/* Déjà collé : le geste reste possible (confirmer qu'elle tient), en retrait. */
+.geste-colle.fait {
+  background: var(--succes-fond);
+  border-color: var(--succes-fond);
+  color: var(--succes-txt);
+}
+
+/* Le toast du détail passe au-dessus du bouton GPS fixe. */
+.detail .toast {
+  bottom: calc(96px + env(safe-area-inset-bottom));
+}
+
+/* Feuille de signalement : monte du bas, pleine largeur sur téléphone. */
+.voile-feuille {
+  place-items: end center;
+  padding: 0;
+}
+.feuille-signal {
+  width: 100%;
+  max-width: var(--largeur-public);
+  max-height: 92dvh;
+  overflow-y: auto;
+  background: var(--creme);
+  border-radius: var(--r-feuille) var(--r-feuille) 0 0;
+  padding: 22px 16px calc(14px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  animation: monte 0.22s ease-out;
+}
+@keyframes monte {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+}
+.signal-titre {
+  margin: 6px 0 6px;
+  font-weight: 900;
+  font-size: 20px;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+.etats-grille {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+.etat-choix {
+  min-height: 64px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1.5px solid var(--bord-carte);
+  background: var(--blanc);
+  color: var(--charbon);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: var(--ombre-carte);
+  transition: border-color 0.15s, background 0.15s;
+}
+.etat-choix:active {
+  transform: scale(0.98);
+}
+.etat-choix .pastille-etat {
+  width: 18px;
+  height: 18px;
+}
+.etat-choix[aria-pressed='true'] {
+  border-color: var(--violet);
+  background: #f6f1fb;
+  box-shadow: 0 0 0 3px var(--violet-12);
+}
+.etat-choix-txt {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.etat-choix-lib {
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.etat-choix-det {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--gris);
+  line-height: 1.3;
+}
+.signal-aide {
+  margin: 12px 2px 0;
+  padding: 10px 12px;
+  border-radius: var(--r-champ);
+  background: var(--alerte-fond);
+  color: var(--alerte-txt);
+  font-size: 14px;
+  line-height: 1.45;
+}
+.signal-commentaire {
+  margin-top: 14px;
+}
+.signal-commentaire textarea {
+  padding: 10px 14px;
+  border-radius: var(--r-champ);
+  border: 1.5px solid var(--bord-champ);
+  background: var(--blanc);
+  font: 500 15px var(--font-sans), sans-serif;
+  color: var(--charbon);
+  resize: none;
+  outline: none;
+}
+.signal-commentaire textarea:focus {
+  border-color: var(--violet);
+  box-shadow: 0 0 0 3px var(--violet-12);
+}
+.feuille-signal .erreur {
+  margin-top: 10px;
+}
+.signal-envoyer {
+  margin-top: 14px;
+  width: 100%;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+.signal-envoyer[disabled] {
+  background: var(--bord-champ);
+  color: var(--gris);
+  box-shadow: none;
+  cursor: default;
+}
+.signal-annuler {
+  align-self: center;
+  margin-top: 12px;
+}
+
+/* Profil : derniers signalements du militant. */
+.activite-chiffres {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.activite-ligne {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--blanc);
+  border: 1px solid var(--bord-carte);
+  border-radius: var(--r-carte);
+  box-shadow: var(--ombre-carte);
+}
+.activite-ligne .pastille-etat {
+  width: 14px;
+  height: 14px;
+  margin-top: 3px;
+}
+.activite-txt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.activite-titre {
+  font-weight: 800;
+  font-size: 14px;
+  line-height: 1.3;
+}
+.activite-meta {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--gris);
+}
+.activite-com {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--charbon);
+}
+.activite-meta b {
+  font-weight: 800;
+  color: var(--charbon);
+}
+
+/* Backoffice : panneaux signalés absents plusieurs fois, en rouge. */
+.ligne-num-rouge {
+  background: var(--rouge);
+  color: #fff;
+}

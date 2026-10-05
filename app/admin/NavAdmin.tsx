@@ -6,12 +6,13 @@ import { usePathname } from 'next/navigation';
 export default function NavAdmin({
   compteurs,
 }: {
-  compteurs: { tournees: number; panneaux: number; admins: number };
+  compteurs: { tournees: number; panneaux: number; absents: number; admins: number };
 }) {
   const ici = usePathname();
   const liens = [
     { href: '/admin', label: 'Tournées', compte: compteurs.tournees, exact: true },
     { href: '/admin/panels', label: 'Panneaux', compte: compteurs.panneaux },
+    { href: '/admin/absents', label: 'Signalés absents', compte: compteurs.absents },
     { href: '/admin/admins', label: 'Comptes admin', compte: compteurs.admins },
   ];
 

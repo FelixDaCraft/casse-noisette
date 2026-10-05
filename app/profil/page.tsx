@@ -2,8 +2,12 @@ import Link from 'next/link';
 import { requireMilitant } from '@/lib/auth';
 import { nomDepartement } from '@/lib/departements';
 import { ROLE_LIBELLE } from '@/lib/militant';
+import { prisma } from '@/lib/db';
+import { ETAT, ilYA } from '@/lib/etatsPanneau';
+import { rueSeule } from '@/lib/maps';
 import Marque, { DuoVioletDef } from '../Marque';
 import Avatar from '../Avatar';
+import { PastilleEtat } from '../Signalement';
 import { deconnexion } from './actions';
 
 export const dynamic = 'force-dynamic';
@@ -26,6 +30,19 @@ export default async function ProfilPage() {
   );
   const nomComplet = [m.firstName, m.lastName].filter(Boolean).join(' ') || m.displayName;
   const lieu = [m.postalCode, m.city].filter(Boolean).join(' ');
+
+  const [derniers, total, colles, panneaux] = await Promise.all([
+    prisma.report.findMany({
+      where: { militantId: m.id },
+      orderBy: { createdAt: 'desc' },
+      take: 15,
+      include: { panel: { select: { name: true, city: true } } },
+    }),
+    prisma.report.count({ where: { militantId: m.id } }),
+    prisma.report.count({ where: { militantId: m.id, status: 'colle' } }),
+    prisma.report.groupBy({ by: ['panelId'], where: { militantId: m.id } }).then((g) => g.length),
+  ]);
+  const maintenant = Date.now();
 
   const infos: [string, string | null][] = [
     ['Email', m.email],
@@ -99,14 +116,51 @@ export default async function ProfilPage() {
           )}
         </section>
 
-        {/* Réservé : signalements de panneaux et progression viendront ici. */}
         <section className="groupe" id="activite">
-          <h2>Mon activité</h2>
-          <div className="profil-activite">
-            <p className="prose">
-              Tes collages et tes signalements de panneaux apparaîtront ici.
-            </p>
-          </div>
+          <h2>
+            Mon activité
+            {total > 0 && <span>{total} signalement{total > 1 ? 's' : ''}</span>}
+          </h2>
+          {total === 0 ? (
+            <div className="profil-activite">
+              <p className="prose">
+                Tes collages et tes signalements de panneaux apparaîtront ici. Ouvre une tournée et
+                touche « J’ai collé » ou « Signaler » sur un panneau.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="stats activite-chiffres">
+                <div className="stat">
+                  <div className="stat-val">{colles}</div>
+                  <div className="stat-lib">collé{colles > 1 ? 's' : ''}</div>
+                </div>
+                <div className="stat">
+                  <div className="stat-val">{total - colles}</div>
+                  <div className="stat-lib">{total - colles > 1 ? 'autres constats' : 'autre constat'}</div>
+                </div>
+                <div className="stat">
+                  <div className="stat-val">{panneaux}</div>
+                  <div className="stat-lib">panneau{panneaux > 1 ? 'x' : ''}</div>
+                </div>
+              </div>
+              <div className="liste">
+                {derniers.map((r) => (
+                  <div className="activite-ligne" key={r.id}>
+                    <PastilleEtat etat={r.status} />
+                    <span className="activite-txt">
+                      <span className="activite-titre">{rueSeule(r.panel.name) || 'Panneau'}</span>
+                      <span className="activite-meta">
+                        <b>{ETAT[r.status].libelle}</b>
+                        {r.panel.city && ` · ${r.panel.city}`} · {ilYA(r.createdAt, maintenant)}
+                      </span>
+                      {r.comment && <span className="activite-com prose">« {r.comment} »</span>}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </section>
 
         <form action={deconnexion} style={{ marginTop: 30 }}>

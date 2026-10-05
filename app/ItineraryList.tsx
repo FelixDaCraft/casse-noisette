@@ -8,8 +8,10 @@ import { useFavoris } from './useFavoris';
 import Marque, { DuoVioletDef } from './Marque';
 import TourneeDetail, { type NoteOrdre } from './TourneeDetail';
 import Avatar from './Avatar';
+import { fraicheur, type EtatCourant } from '@/lib/etatsPanneau';
+import { bilan, type Etats } from './Signalement';
 
-type Panel = { name: string; lat: number; lng: number; city: string | null };
+type Panel = { id: string; name: string; lat: number; lng: number; city: string | null };
 type Kind = 'circo' | 'ville';
 type It = { id: string; name: string; city: string | null; kind: Kind; panels: Panel[] };
 
@@ -121,21 +123,53 @@ const IconCarte = (
   </svg>
 );
 
+const IconOk = (
+  <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+);
+
 const groupeDe = (it: It) => it.city?.trim() || 'Autres';
 
 export default function ItineraryList({
   itineraries,
+  etats: etatsInitiaux,
+  maintenant: rendu,
   moi,
   departement,
   initial = {},
 }: {
   /** Les tournées d'un seul département : la page ne charge que celui-là. */
   itineraries: It[];
+  /** État courant des panneaux de ces tournées (dernier signalement). */
+  etats: Etats;
+  /** Heure du rendu serveur : « il y a 2 j » se calcule pareil des deux côtés. */
+  maintenant: number;
   moi: { nom: string; image: string | null };
   departement: { code: string; nom: string };
   /** Vue et commune demandées par l'URL (résultat de recherche). */
-  initial?: { vue?: Kind; lieu?: string };
+  initial?: { vue?: Kind; lieu?: string; repasser?: boolean };
 }) {
+  // Les signalements faits depuis cette page s'y ajoutent sans recharger.
+  const [etats, setEtats] = useState<Etats>(etatsInitiaux);
+  const [maintenant, setMaintenant] = useState(rendu);
+  const onSignale = useCallback((panelId: string, e: EtatCourant) => {
+    setEtats((cur) => ({ ...cur, [panelId]: e }));
+    setMaintenant(Date.now());
+  }, []);
+  // Les durées « il y a… » vieillissent avec la page restée ouverte.
+  useEffect(() => {
+    setMaintenant(Date.now());
+    const t = setInterval(() => setMaintenant(Date.now()), 60_000);
+    return () => clearInterval(t);
+  }, []);
+  const aRepasser = useCallback(
+    (it: It) => bilan(it.panels.map((p) => p.id), etats).aRepasser,
+    [etats],
+  );
+  // Filtre « à repasser » : seulement les tournées où il reste du travail.
+  const [repasser, setRepasser] = useState(Boolean(initial.repasser));
+
   // Le collage urbain se fait à pied : c'est le mode par défaut de la charte.
   const [mode, setMode] = useState<Mode>('walking');
   const [vue, setVue] = useState<Kind>(() => {
@@ -164,7 +198,15 @@ export default function ItineraryList({
 
   const { favoris, basculer } = useFavoris();
 
-  const duVue = useMemo(() => itineraries.filter((it) => it.kind === vue), [itineraries, vue]);
+  const deLaVue = useMemo(() => itineraries.filter((it) => it.kind === vue), [itineraries, vue]);
+  const nbARepasser = useMemo(() => deLaVue.filter((it) => aRepasser(it) > 0).length, [deLaVue, aRepasser]);
+  const duVue = useMemo(
+    () => (repasser ? deLaVue.filter((it) => aRepasser(it) > 0) : deLaVue),
+    // Le filtre ne se recalcule pas à chaque signalement : une tournée qu'on
+    // vient de finir ne doit pas disparaître de sous le doigt.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [deLaVue, repasser],
+  );
   // Une commune et une circonscription peuvent porter le même nom, et « 4ème
   // circonscription » existe dans chaque département : le favori retient donc
   // aussi l'onglet et le département d'où il vient.
@@ -274,6 +316,9 @@ export default function ItineraryList({
           mesure={mesures[selection.id]}
           note={note}
           position={position}
+          etats={etats}
+          maintenant={maintenant}
+          onSignale={onSignale}
           onRetour={fermer}
           modes={MODES.map((m) => (
             <button
@@ -365,6 +410,25 @@ export default function ItineraryList({
           ))}
         </div>
 
+        {(nbARepasser > 0 || repasser) && (
+          <button
+            type="button"
+            className={'filtre-repasser' + (repasser ? ' actif' : '')}
+            aria-pressed={repasser}
+            onClick={() => {
+              // Une commune sans rien à repasser viderait la liste : on la lâche.
+              if (!repasser && commune && !deLaVue.some((it) => groupeDe(it) === commune && aRepasser(it) > 0)) {
+                setCommune(null);
+              }
+              setRepasser(!repasser);
+            }}
+          >
+            <span className="pastille-etat etat-arrache" aria-hidden="true" />
+            À repasser
+            <span className="vue-cnt">{nbARepasser}</span>
+          </button>
+        )}
+
         {communes.length >= 2 && (
           <div className="chips">
             <button
@@ -392,7 +456,11 @@ export default function ItineraryList({
       </div>
 
       <main className="corps">
-        {visibles.length === 0 && <p className="vide">Aucune tournée pour le moment.</p>}
+        {visibles.length === 0 && (
+          <p className="vide">
+            {repasser ? 'Rien à repasser ici : tous les panneaux signalés sont en place.' : 'Aucune tournée pour le moment.'}
+          </p>
+        )}
 
         {groupes.map((g) => (
           <section className="groupe" key={g.city}>
@@ -422,6 +490,8 @@ export default function ItineraryList({
                   mode={mode}
                   ordre={orders[it.id]}
                   mesure={mesures[it.id]}
+                  etats={etats}
+                  maintenant={maintenant}
                   onOuvrir={() => ouvrir(it.id)}
                 />
               ))}
@@ -444,6 +514,8 @@ function Carte({
   mode,
   ordre,
   mesure,
+  etats,
+  maintenant,
   onOuvrir,
 }: {
   it: It;
@@ -451,8 +523,11 @@ function Carte({
   mode: Mode;
   ordre?: number[];
   mesure?: Mesure;
+  etats: Etats;
+  maintenant: number;
   onOuvrir: () => void;
 }) {
+  const { aRepasser, dernier } = bilan(it.panels.map((p) => p.id), etats);
   const panels = ordre ? ordre.map((i) => it.panels[i]) : it.panels;
   const url = gmapsUrl(panels, mode);
   // Un nom auto « de X à Y » ne décrit plus le parcours une fois réordonné :
@@ -482,6 +557,19 @@ function Carte({
             <span className="tournee-titre">{communes || titre}</span>
             {communes && <span className="tournee-meta">{titre}</span>}
           </span>
+          {dernier && (
+            // Pastille rouge : panneaux à repasser ; verte : tout est en
+            // place. Dessous, l'âge du dernier constat sur la tournée.
+            <span className="tournee-etat" title={`Dernier signalement il y a ${fraicheur(dernier, maintenant)}`}>
+              <span className={'tournee-etat-cnt' + (aRepasser > 0 ? '' : ' ok')}>
+                {aRepasser > 0 ? aRepasser : IconOk}
+                <span className="sr">
+                  {aRepasser > 0 ? ` panneau${aRepasser > 1 ? 'x' : ''} à repasser` : ' tout est en place'}
+                </span>
+              </span>
+              <span className="tournee-etat-age">{fraicheur(dernier, maintenant)}</span>
+            </span>
+          )}
           <span className="tournee-chev">{IconChev}</span>
         </button>
       </article>

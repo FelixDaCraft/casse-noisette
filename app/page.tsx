@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { requireMilitant } from '@/lib/auth';
 import { DEPARTEMENTS, DEP_COOKIE, codeDepartement } from '@/lib/departements';
 import { indexFrance } from '@/lib/indexFrance';
+import { etatsCourants } from '@/lib/signalements';
 import ItineraryList from './ItineraryList';
 import ChoixDepartement from './ChoixDepartement';
 
@@ -53,22 +54,32 @@ export default async function Home({ searchParams }: { searchParams: Promise<Par
     city: it.city,
     kind: it.kind,
     panels: it.stops.map((s) => ({
+      id: s.panel.id,
       name: s.panel.name,
       lat: s.panel.lat,
       lng: s.panel.lng,
       city: s.panel.city,
     })),
   }));
+  // État courant de chaque panneau du département : la liste en tire ses
+  // compteurs « à repasser », le détail ses pastilles.
+  const etats = await etatsCourants([...new Set(data.flatMap((it) => it.panels.map((p) => p.id)))]);
   const vue = un(sp.vue);
   return (
     <ItineraryList
       // Changer de département ou suivre un résultat de recherche remet la
       // liste à zéro (vue, commune, détail) sur ce qui a été demandé.
-      key={`${dep}|${vue ?? ''}|${un(sp.lieu) ?? ''}`}
+      key={`${dep}|${vue ?? ''}|${un(sp.lieu) ?? ''}|${un(sp.filtre) ?? ''}`}
       itineraries={data}
+      etats={etats}
+      maintenant={Date.now()}
       moi={moi}
       departement={{ code: dep, nom: DEPARTEMENTS[dep] }}
-      initial={{ vue: vue === 'ville' || vue === 'circo' ? vue : undefined, lieu: un(sp.lieu) }}
+      initial={{
+        vue: vue === 'ville' || vue === 'circo' ? vue : undefined,
+        lieu: un(sp.lieu),
+        repasser: un(sp.filtre) === 'repasser',
+      }}
     />
   );
 }

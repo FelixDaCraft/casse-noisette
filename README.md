@@ -35,7 +35,7 @@ lance directement en navigation GPS, plus un vrai outil de gestion derrière.
   configuré (`AP_CLIENT_ID` / `AP_CLIENT_SECRET`). Accès refusé à qui n'est membre d'aucun
   groupe d'action (comme TokTok).
 - 👤 **Profil** : identité, département, groupes d'action et rôle, repris d'AP à chaque
-  connexion ; place réservée à « Mon activité ».
+  connexion ; « Mon activité » liste ses derniers signalements.
 
 ### 🌍 Tournées (`/`, militants connectés)
 - 🇫🇷 **Un département à la fois** — la page ne charge que les tournées du département
@@ -47,6 +47,16 @@ lance directement en navigation GPS, plus un vrai outil de gestion derrière.
 - 🧭 **Ordre de passage adapté au point de départ** — les panneaux sont réordonnés
   automatiquement pour que le trajet soit le plus court **depuis là où tu te trouves**,
   sur les **distances réelles par la route** (à pied / vélo / voiture).
+- 🚩 **État des panneaux, signalé par les militants** — collé par nous, recouvert,
+  arraché, tagué (à photographier pour une plainte), vide, absent. Dans le détail d'une
+  tournée, chaque panneau montre son état courant (« Tagué · il y a 2 j par Camille L. »)
+  et deux gestes : **« J'ai collé »** en un tap, ou **« Signaler »**, qui ouvre une feuille
+  avec les états en gros boutons (le marqueur sur la carte l'ouvre aussi). La liste
+  affiche le nombre de panneaux **à repasser** par tournée et l'âge du dernier constat, et
+  un filtre « À repasser » (`/?filtre=repasser`). Historique complet conservé ; l'état
+  courant est le dernier signalement. Anti-abus : pas deux signalements du même panneau
+  par le même militant en moins de 10 min (sauf « collé » juste après un autre état),
+  30 max par 5 min.
 - 🗺️ **Google Maps** — itinéraire multi-arrêts + **lancement direct du GPS** (`dir_action=navigate`), toujours depuis la position de l'utilisateur.
 - 📨 **Partage Telegram** par itinéraire.
 - 🚶🚲🚗 Sélecteur de mode + option « depuis ma position ».
@@ -58,6 +68,8 @@ lance directement en navigation GPS, plus un vrai outil de gestion derrière.
 - 📋 Itinéraires : **créer / renommer / réordonner / supprimer**.
 - 📍 Panneaux : **carte Leaflet** — clic pour ajouter, glisser-déposer pour déplacer ;
   renommer / réordonner / supprimer. **Max 10 panneaux** par itinéraire (limite Google Maps).
+- 🚫 **Signalés absents** (`/admin/absents`) : panneaux dont le dernier état est « absent »,
+  ceux signalés 2 fois ou plus en tête, avec la suppression (de toutes les tournées).
 - 👥 Gestion des **comptes admin** : créer / désactiver / supprimer.
 - 🔁 **Reset de mot de passe par email** (jetons à usage unique, valables 1 h, via Resend).
 
@@ -142,6 +154,11 @@ Militant ──< Membership >── ActionGroup
               image?, department?, postalCode?, city?, active, lastLoginAt
   ActionGroup apId (unique), name, type, department?, city?
   Membership  role : abonne | membre | gestionnaire | animateur
+
+Panel ──< Report >── Militant
+  Report      panelId, militantId? (SetNull), status, comment?, createdAt
+  status      colle | recouvert | arrache | tague | vide | absent
+  L'état courant d'un panneau = son dernier Report (DISTINCT ON, lib/signalements.ts).
 ```
 
 ---

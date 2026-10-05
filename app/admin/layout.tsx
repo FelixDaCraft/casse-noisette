@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getCurrentAdmin } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { panneauxAbsents } from '@/lib/signalements';
 import { logout } from './actions';
 import Marque, { DuoVioletDef } from '../Marque';
 import NavAdmin from './NavAdmin';
@@ -14,9 +15,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // ces écrans ont leur propre mise en page en deux colonnes.
   if (!admin) return <>{children}</>;
 
-  const [tournees, panneaux, admins] = await Promise.all([
+  const [tournees, panneaux, absents, admins] = await Promise.all([
     prisma.itinerary.count(),
     prisma.panel.count(),
+    panneauxAbsents().then((l) => l.length),
     prisma.admin.count(),
   ]);
 
@@ -32,7 +34,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </div>
         </div>
 
-        <NavAdmin compteurs={{ tournees, panneaux, admins }} />
+        <NavAdmin compteurs={{ tournees, panneaux, absents, admins }} />
 
         <div className="sidebar-pied">
           <span className="sidebar-moi">{admin.email}</span>

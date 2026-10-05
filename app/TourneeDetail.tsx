@@ -1,10 +1,13 @@
 'use client';
 import 'leaflet/dist/leaflet.css';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { gmapsUrl, telegramUrl, type Mode } from '@/lib/maps';
+import { A_REPASSER, ETAT, type EtatCourant } from '@/lib/etatsPanneau';
 import type { Mesure } from './useOptimizedOrder';
+import { useToast } from './admin/Toast';
+import { FeuilleSignalement, LigneEtat, bilan, envoyerSignalement, type Etats } from './Signalement';
 
-type Panel = { name: string; lat: number; lng: number };
+type Panel = { id: string; name: string; lat: number; lng: number };
 type Coord = { lat: number; lng: number };
 
 /** Note affichée à droite de « Ordre de passage ». */
@@ -19,6 +22,21 @@ const dureeVal = (s: number) =>
   s < 5400 ? `${Math.max(1, Math.round(s / 60))}` : `${(s / 3600).toFixed(1).replace('.', ',')}`;
 const dureeUnite = (s: number) => (s < 5400 ? 'minutes' : 'heures');
 
+const IconCheck = (
+  <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+);
+const IconDrapeau = (
+  <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M4 22V4c4-2 8 2 12 0v10c-4 2-8-2-12 0" />
+  </svg>
+);
+
+/** Échappe un nom de rue avant de l'injecter dans le HTML d'une infobulle Leaflet. */
+const html = (t: string) =>
+  t.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+
 export default function TourneeDetail({
   titre,
   kicker,
@@ -28,6 +46,9 @@ export default function TourneeDetail({
   mesure,
   note,
   position,
+  etats,
+  maintenant,
+  onSignale,
   onRetour,
 }: {
   titre: string;
@@ -38,16 +59,33 @@ export default function TourneeDetail({
   mesure?: Mesure;
   note: NoteOrdre;
   position: Coord | null;
+  /** État courant de chaque panneau (dernier signalement). */
+  etats: Etats;
+  maintenant: number;
+  onSignale: (panelId: string, e: EtatCourant) => void;
   onRetour: () => void;
 }) {
+  // Panneau dont la feuille de signalement est ouverte (indice dans `panels`).
+  const [aSignaler, setASignaler] = useState<number | null>(null);
+  // Panneau en cours d'envoi par le bouton « J'ai collé ».
+  const [collage, setCollage] = useState<string | null>(null);
+  const { toast, element: toastEl } = useToast();
+
+  const jaiColle = async (p: Panel) => {
+    setCollage(p.id);
+    const err = await envoyerSignalement(p.id, 'colle', undefined, onSignale);
+    setCollage(null);
+    toast(err ?? 'Merci ! Panneau marqué collé.');
+  };
+
   const mapEl = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const layerRef = useRef<any>(null);
   const LRef = useRef<any>(null);
   // Le tracé se redessine à chaque changement d'ordre : on lit les valeurs
   // courantes dans l'effet de dessin sans recréer la carte.
-  const dataRef = useRef({ panels, position });
-  dataRef.current = { panels, position };
+  const dataRef = useRef({ panels, position, etats });
+  dataRef.current = { panels, position, etats };
 
   useEffect(() => {
     let cancelled = false;
@@ -80,14 +118,14 @@ export default function TourneeDetail({
   useEffect(() => {
     dessiner();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [panels, position]);
+  }, [panels, position, etats]);
 
   function dessiner() {
     const L = LRef.current;
     const layer = layerRef.current;
     const map = mapRef.current;
     if (!L || !layer || !map) return;
-    const { panels: pts, position: pos } = dataRef.current;
+    const { panels: pts, position: pos, etats: ets } = dataRef.current;
     layer.clearLayers();
 
     // Tracé pointillé dans l'ordre de passage.
@@ -98,16 +136,21 @@ export default function TourneeDetail({
       ).addTo(layer);
     }
 
+    // Le marqueur prend la couleur de l'état du panneau ; le toucher ouvre
+    // directement la feuille de signalement.
     pts.forEach((p, i) => {
+      const e = ets[p.id];
       const icon = L.divIcon({
         className: '',
-        html: `<div class="cn-marker">${i + 1}</div>`,
+        html: `<div class="cn-marker${e ? ` etat-${e.etat}` : ''}">${i + 1}</div>`,
         iconSize: [30, 30],
         iconAnchor: [15, 15],
       });
+      const nom = html(p.name || `Panneau ${i + 1}`);
       L.marker([p.lat, p.lng], { icon })
         .addTo(layer)
-        .bindTooltip(p.name || `Panneau ${i + 1}`);
+        .bindTooltip(e ? `${nom}<br><b>${ETAT[e.etat].libelle}</b>` : nom)
+        .on('click', () => setASignaler(i));
     });
 
     if (pos) {
@@ -123,6 +166,9 @@ export default function TourneeDetail({
   }
 
   const url = gmapsUrl(panels, mode);
+  const etatTournee = bilan(panels.map((p) => p.id), etats);
+  const colles = panels.filter((p) => etats[p.id]?.etat === 'colle').length;
+  const enCours = aSignaler != null ? panels[aSignaler] : undefined;
 
   return (
     <div className="detail">
@@ -163,6 +209,17 @@ export default function TourneeDetail({
           </div>
         </div>
 
+        {(etatTournee.aRepasser > 0 || colles > 0) && (
+          <p className="etat-resume">
+            {etatTournee.aRepasser > 0 && (
+              <span className="a-repasser">
+                {etatTournee.aRepasser} à repasser
+              </span>
+            )}
+            {colles > 0 && <span>{colles} collé{colles > 1 ? 's' : ''}</span>}
+          </p>
+        )}
+
         <div className="modes-compact">{modes}</div>
 
         <div className="ordre-tete">
@@ -178,14 +235,49 @@ export default function TourneeDetail({
             </span>
             <span className="frise-nom">Ta position</span>
           </li>
-          {panels.map((p, i) => (
-            <li key={i}>
-              <span className="frise-rond">{i + 1}</span>
-              <span className="frise-nom">{p.name || `Panneau ${i + 1}`}</span>
-            </li>
-          ))}
+          {panels.map((p, i) => {
+            const e = etats[p.id];
+            return (
+              <li key={p.id} className="frise-panneau">
+                <span className={'frise-rond' + (e ? ` etat-${e.etat}` : '')}>{i + 1}</span>
+                <div className="frise-corps">
+                  <span className="frise-nom">{p.name || `Panneau ${i + 1}`}</span>
+                  <LigneEtat courant={e} maintenant={maintenant} />
+                  <div className="frise-gestes">
+                    <button
+                      type="button"
+                      className={'geste geste-colle' + (e?.etat === 'colle' ? ' fait' : '')}
+                      onClick={() => jaiColle(p)}
+                      disabled={collage === p.id}
+                    >
+                      {IconCheck}
+                      {collage === p.id ? 'Envoi…' : 'J’ai collé'}
+                    </button>
+                    <button type="button" className="geste" onClick={() => setASignaler(i)}>
+                      {IconDrapeau}
+                      Signaler
+                    </button>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
         </ol>
       </div>
+
+      {enCours && (
+        <FeuilleSignalement
+          panneau={{ id: enCours.id, name: enCours.name, num: aSignaler! + 1 }}
+          courant={etats[enCours.id]}
+          maintenant={maintenant}
+          onSignale={(id, e) => {
+            onSignale(id, e);
+            toast(A_REPASSER.has(e.etat) ? 'Signalé : le panneau est à repasser.' : 'Merci, c’est noté.');
+          }}
+          onFermer={() => setASignaler(null)}
+        />
+      )}
+      {toastEl}
 
       <div className="cta-zone">
         <div className="cta-inner">
