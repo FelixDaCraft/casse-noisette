@@ -65,11 +65,26 @@ export interface FournisseurIdentite {
   profil(jeton: string): Promise<ProfilAP>;
 }
 
-/** Simulation tant que le vrai client n'existe pas : forcée par AP_MOCK=1,
- *  active par défaut hors production (AP_MOCK=0 pour tester le vrai en dev). */
+/** Simulation tant que le vrai client n'existe pas : active par défaut hors
+ *  production (AP_MOCK=0 pour tester le vrai en dev).
+ *
+ *  En production, elle ouvrirait l'appli à n'importe qui (on choisit son
+ *  compte dans une liste) : AP_MOCK=1 n'y est accepté que si le site est servi
+ *  en local (SITE_URL sur localhost), c'est-à-dire pour vérifier un build sur
+ *  son poste. Une variable oubliée dans le docker-compose du serveur ne suffit
+ *  donc plus à tout ouvrir. Fail-closed : sans SITE_URL, pas de simulation. */
 export function simulationActive(): boolean {
-  if (process.env.AP_MOCK === '1') return true;
-  return process.env.NODE_ENV !== 'production' && process.env.AP_MOCK !== '0';
+  if (process.env.NODE_ENV !== 'production') return process.env.AP_MOCK !== '0';
+  return process.env.AP_MOCK === '1' && siteLocal();
+}
+
+function siteLocal(): boolean {
+  try {
+    const h = new URL(process.env.SITE_URL ?? '').hostname;
+    return h === 'localhost' || h === '127.0.0.1' || h === '[::1]';
+  } catch {
+    return false;
+  }
 }
 
 export function fournisseur(): FournisseurIdentite {

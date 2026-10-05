@@ -266,7 +266,7 @@ node prisma/generer-activite-demo.mjs --supprimer # efface tout ce qu'il a cré�
 | `NEXT_PUBLIC_SITE_URL` | URL publique (liens dans les emails) |
 | `SITE_URL` | URL publique lue à l'exécution : `redirect_uri` de la connexion Action Populaire |
 | `AP_CLIENT_ID` / `AP_CLIENT_SECRET` | Client OAuth Action Populaire (à demander à l'équipe numérique LFI) |
-| `AP_MOCK` | `1` force la simulation (même en prod, à éviter), `0` la coupe en dev |
+| `AP_MOCK` | `0` coupe la simulation en dev ; `1` la force sur un build de prod, mais seulement si `SITE_URL` est sur localhost (vérification locale) : jamais sur le serveur |
 | `AP_SCOPES` / `AP_BASE_URL` / `AP_*_URL` | Réglages fins du fournisseur (valeurs par défaut d'après le code d'AP) |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` | SMTP (Resend) — optionnel |
 | `MAIL_FROM` | Expéditeur des emails de reset |
