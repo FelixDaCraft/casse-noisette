@@ -37,6 +37,9 @@ const MAX_ARRETS = 10;
  *  bloc, et la découper n'ajoute qu'un niveau de lecture inutile. */
 const SEUIL_QUARTIER = 100;
 const OSRM = process.env.OSRM_URL_DRIVING || 'http://127.0.0.1:5100';
+/** Au-delà, OSRM a accroché le point loin de la route : il est hors de la zone
+ *  préparée (même seuil que la navigation, lib/guidage.ts). */
+const ACCROCHE_MAX_M = 300;
 /** Ce qu'on accepte de perdre en durée totale pour resserrer l'écart entre
  *  tournées : une seconde d'écart pèse autant que POIDS_EQUILIBRE secondes de
  *  trajet. Au-delà, on rallonge tout le monde pour aligner deux tournées. */
@@ -68,7 +71,16 @@ async function matriceOsrm(points, etiquette = '') {
         { headers: { connection: 'close' }, signal: AbortSignal.timeout(30000) });
       const j = await r.json().catch(() => ({}));
       if (r.ok && j.code === 'Ok' && j.distances) {
-        const nb = (m) => m.map((row) => row.map((v) => (typeof v === 'number' ? v : NaN)));
+        // Hors de la zone préparée, OSRM accroche le point à la route connue la
+        // plus proche, parfois à des centaines de kilomètres, et répond « Ok » :
+        // ces points-là repassent au vol d'oiseau plutôt que de fausser la tournée.
+        const loin = (j.sources ?? []).map((w) => (w.distance ?? 0) > ACCROCHE_MAX_M);
+        if (loin.every(Boolean)) {
+          console.warn(`  ! OSRM ${etiquette} : hors de la zone couverte, vol d’oiseau`);
+          return null;
+        }
+        const nb = (m) => m.map((row, a) => row.map((v, b) =>
+          (typeof v === 'number' && !loin[a] && !loin[b] ? v : NaN)));
         return { d: nb(j.distances), t: j.durations ? nb(j.durations) : null };
       }
       console.warn(`  ! OSRM ${etiquette} (${points.length} pts) : HTTP ${r.status} ${j.code ?? ''} ${j.message ?? ''}`.trimEnd());

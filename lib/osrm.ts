@@ -18,6 +18,7 @@
 //     les appels après plusieurs échecs (l'appelant retombe sur le vol d'oiseau).
 
 import type { Mode } from './maps';
+import { ACCROCHE_MAX_M } from './guidage';
 
 const PROFILE: Record<Mode, string> = {
   walking: 'routed-foot',
@@ -135,11 +136,21 @@ async function call(url: string): Promise<Table | null> {
       code?: string;
       distances?: (number | null)[][];
       durations?: (number | null)[][];
+      sources?: { distance?: number }[];
+      destinations?: { distance?: number }[];
     };
     if (body.code !== 'Ok' || !Array.isArray(body.distances)) return null;
+    // Hors de la zone préparée, OSRM accroche le point à la route la plus proche
+    // qu'il connaisse, parfois à des centaines de kilomètres, et répond « Ok ».
+    // Ces lignes et colonnes-là passent en NaN, comme un point non rattaché :
+    // pas d'échec compté, le disjoncteur ne doit pas couper OSRM pour tous.
+    const loin = (w?: { distance?: number }[]) => (w ?? []).map((p) => (p.distance ?? 0) > ACCROCHE_MAX_M);
+    const srcLoin = loin(body.sources);
+    const dstLoin = loin(body.destinations);
     // Une valeur `null` signale un point non rattaché au réseau : on la laisse
     // remonter en NaN pour que l'appelant retombe sur le vol d'oiseau pour cette paire.
-    const nb = (m: (number | null)[][]) => m.map((row) => row.map((d) => (typeof d === 'number' ? d : NaN)));
+    const nb = (m: (number | null)[][]) =>
+      m.map((row, i) => row.map((d, j) => (typeof d === 'number' && !srcLoin[i] && !dstLoin[j] ? d : NaN)));
     return {
       distances: nb(body.distances),
       durations: Array.isArray(body.durations) ? nb(body.durations) : null,
