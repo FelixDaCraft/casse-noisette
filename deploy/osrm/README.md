@@ -87,3 +87,28 @@ rm -rf data/source.osm.pbf data/region.osm.pbf data/car data/bike data/foot
   panneaux sortent de la zone.
 - **L'app n'utilise pas l'instance** : vérifier les variables dans le `.env` de
   l'app puis recréer le conteneur web (les variables sont lues au démarrage).
+
+## France entière (région par région)
+
+Le jeu Loire-Atlantique ci-dessus est remplacé par `/opt/osrm-france` :
+
+```bash
+mkdir -p /opt/osrm-france && cd /opt/osrm-france
+# copier prepare-regions.sh, generer-compose.sh et passerelle/ depuis deploy/osrm/
+./prepare-regions.sh            # 13 régions + 5 outre-mer, plusieurs heures, ~40 Go
+./generer-compose.sh && docker compose up -d --remove-orphans
+```
+
+- Une région se prépare en quelques Go de RAM (la France d'un bloc en demanderait 20 à 30).
+- Les instances servent en `--mmap` : quasiment rien en RAM au repos.
+- La **passerelle** (`osrm-passerelle`, 127.0.0.1:5099 sur l'hôte) choisit la région
+  d'après les coordonnées de la requête. Côté application :
+
+```bash
+OSRM_URL_DRIVING="http://osrm-passerelle:5000/car"
+OSRM_URL_BICYCLING="http://osrm-passerelle:5000/bike"
+OSRM_URL_WALKING="http://osrm-passerelle:5000/foot"
+```
+
+Relancer `generer-compose.sh` après chaque région préparée : une région absente
+répond 503 et l'appli prend ses solutions de secours.
