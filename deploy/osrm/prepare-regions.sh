@@ -62,7 +62,8 @@ for R in "${CIBLES[@]}"; do
   for P in $PARTIES; do
     if [ ! -f "sources/$P.osm.pbf" ]; then
       echo "==> $R : téléchargement de $P"
-      curl -fsSL -o "sources/$P.osm.pbf.part" "$GEOFABRIK/$P-latest.osm.pbf"
+      # Réessais : une coupure DNS passagère du homelab a déjà interrompu une nuit de calcul.
+      curl -fsSL --retry 5 --retry-delay 60 --retry-all-errors -o "sources/$P.osm.pbf.part" "$GEOFABRIK/$P-latest.osm.pbf"
       mv "sources/$P.osm.pbf.part" "sources/$P.osm.pbf"
     fi
     FICHIERS+=("/s/$P.osm.pbf")
