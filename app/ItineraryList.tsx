@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { DEP_COOKIE } from '@/lib/departements';
 import { gmapsUrl, cleanName, isAutoName, rueSeule, type Mode } from '@/lib/maps';
@@ -7,11 +8,21 @@ import { useOptimizedOrder, type Status, type Mesure } from './useOptimizedOrder
 import { useFavoris } from './useFavoris';
 import Marque, { DuoVioletDef } from './Marque';
 import TourneeDetail, { type NoteOrdre } from './TourneeDetail';
-import Navigation from './Navigation';
 import { debloquerVoix } from './useVoix';
 import HdMoi from './HdMoi';
 import { fraicheur, type EtatCourant } from '@/lib/etatsPanneau';
 import { bilan, type Etats } from './Signalement';
+
+// Le mode « Tournée » embarque MapLibre et Ferrostar (WebAssembly compris) :
+// chargé seulement quand on le lance, jamais côté serveur.
+const Navigation = dynamic(() => import('./Navigation'), {
+  ssr: false,
+  loading: () => (
+    <div className="nav nav-chargement" role="status">
+      Préparation du guidage…
+    </div>
+  ),
+});
 
 type Panel = { id: string; name: string; lat: number; lng: number; city: string | null };
 type Kind = 'circo' | 'ville';

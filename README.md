@@ -10,7 +10,7 @@ une page publique qui ouvre la navigation GPS d'un clic, et un backoffice comple
 
 🔗 **Site :** [casse-noisette.aynn.fr](https://casse-noisette.aynn.fr) · 🔐 **Admin :** [`/admin`](https://casse-noisette.aynn.fr/admin)
 
-`Next.js 15` · `React 19` · `PostgreSQL` · `Prisma` · `Leaflet` · `PWA`
+`Next.js 15` · `React 19` · `PostgreSQL` · `Prisma` · `Leaflet` · `MapLibre` · `Ferrostar` · `Valhalla` · `PWA`
 
 </div>
 
@@ -71,19 +71,31 @@ lance directement en navigation GPS, plus un vrai outil de gestion derrière.
   semaine / mois / campagne. Petite récompense animée après un collage (immobile avec
   `prefers-reduced-motion`).
 - 🧭 **Mode « Tournée » : navigation guidée dans l'appli** — « Démarrer la tournée » ouvre un
-  écran plein écran qui guide de panneau en panneau (ordre figé au départ) : carte qui suit
-  la position, tracé jusqu'au prochain panneau, bandeau « Dans 200 m, tourne à droite sur
-  la rue X », distance et durée restantes (panneau et tournée), voix française
-  (désactivable), recalcul automatique si l'on s'écarte du tracé (≥ 45 m pendant 4 s,
-  jamais plus d'un calcul toutes les 10 s), écran maintenu allumé (Wake Lock). À moins de
-  40 m (50 m en voiture), la feuille d'arrivée propose **Collé** (même action que « J'ai
-  collé »), les autres constats et « Passer », puis enchaîne ; récapitulatif à la fin
-  (collés, temps, points). Itinéraires et consignes viennent de **notre OSRM** via
-  `POST /api/navigation` (session militant, OSRM jamais exposé au navigateur) ; consignes
-  en français dans `lib/consignes.ts`, géométrie dans `lib/guidage.ts`
-  (`node --test scripts/tester-navigation.mjs`). Notre OSRM ne couvre que la
-  Loire-Atlantique : un point accroché à plus de 300 m de la route est déclaré **hors
-  couverture** et l'écran propose Google Maps au lieu d'un faux guidage.
+  écran plein écran qui guide de panneau en panneau (ordre figé au départ), comme un GPS :
+  carte vectorielle **MapLibre GL JS** (fond **OpenFreeMap**, gratuit et sans clé) orientée
+  dans le sens de la marche et inclinée, tracé violet jusqu'au prochain panneau, bandeau
+  « 200 m — Tournez à droite dans Rue X », distance et durée restantes (panneau et tournée),
+  voix française (désactivable), écran maintenu allumé (Wake Lock). Le moteur de guidage est
+  **Ferrostar** (Stadia Maps, libre) : suivi du tracé, avancement des étapes, détection de
+  l'écart (recalcul après 4 s à plus de 45 m du tracé, jamais plus d'un calcul toutes les
+  10 s, pas avant d'avoir rejoint le tracé). Itinéraires et consignes en français viennent de
+  **notre Valhalla** via `POST /api/valhalla/route` (session militant, même limite que les
+  autres calculs : 60 / 5 min ; la requête de Ferrostar est reconstruite champ par champ,
+  Valhalla n'est jamais exposé au navigateur). Un seul itinéraire enchaîne tous les panneaux
+  restants (total de la tournée exact) mais le guidage s'arrête au prochain : à moins de 40 m
+  (50 m en voiture), la feuille d'arrivée propose **Collé** (même action que « J'ai collé »),
+  les autres constats et « Passer », puis enchaîne ; récapitulatif à la fin (collés, temps,
+  points). Valhalla ne couvre pour l'instant que les **Pays de la Loire** : un point accroché
+  à plus de 300 m de la route (ou introuvable) est déclaré **hors couverture** et l'écran
+  propose Google Maps au lieu d'un faux guidage. MapLibre, Ferrostar et son WebAssembly
+  (~610 ko compressés) ne sont chargés qu'à l'entrée dans ce mode. Tests :
+  `node --test scripts/tester-navigation.mjs` ; en développement, `/?simulation=1` fait
+  parcourir le trajet par une position simulée (Ferrostar), pour tester une tournée entière
+  sans bouger.
+- 📤 **Export GPX pour OsmAnd** — en bas du détail d'une tournée, « Exporter vers OsmAnd
+  (GPX) » télécharge les panneaux dans l'ordre courant (waypoints nommés + une route qui les
+  enchaîne, généré dans le navigateur) : ouvrir avec OsmAnd → « Naviguer par la trace », pour
+  un guidage qui continue écran verrouillé.
 - 🗺️ **Google Maps** — itinéraire multi-arrêts + **lancement direct du GPS** (`dir_action=navigate`), toujours depuis la position de l'utilisateur ; reste proposé en secours pour chaque trajet du mode Tournée.
 - 📨 **Partage Telegram** par itinéraire.
 - 🚶🚲🚗 Sélecteur de mode + option « depuis ma position ».
@@ -148,7 +160,8 @@ lance directement en navigation GPS, plus un vrai outil de gestion derrière.
 |---|---|
 | 🖥️ Framework | **Next.js 15** (App Router, Server Actions) · **React 19** · TypeScript |
 | 🗄️ Base de données | **PostgreSQL 16** + **Prisma** |
-| 🗺️ Carte (éditeur) | **Leaflet** + tuiles OpenStreetMap (sans clé API) |
+| 🗺️ Carte (éditeur, détail) | **Leaflet** + tuiles OpenStreetMap (sans clé API) |
+| 🧭 Navigation | **Ferrostar** (`@stadiamaps/ferrostar-webcomponents`) + **MapLibre GL JS** sur fond **OpenFreeMap** ; itinéraires **Valhalla** auto-hébergé |
 | 🔐 Auth | Maison : sessions **cookie signé HMAC** + mots de passe **scrypt** (stdlib, zéro dépendance native) |
 | ✉️ Email | **nodemailer** (SMTP) via **Resend** |
 | 🎨 UI | CSS Modules / global, fonts `next/font` (Fraunces + Inter), glassmorphism |
@@ -285,6 +298,8 @@ node prisma/generer-activite-demo.mjs --supprimer # efface tout ce qu'il a cré�
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` | SMTP (Resend) — optionnel |
 | `MAIL_FROM` | Expéditeur des emails de reset |
 | `OSRM_URL_DRIVING` / `OSRM_URL_BICYCLING` / `OSRM_URL_WALKING` | Instance OSRM auto-hébergée, une URL par mode (voir `deploy/osrm/`) — active le mode instantané |
+| `VALHALLA_URL` | Valhalla auto-hébergé du mode « Tournée » (appelé par le serveur seulement) ; sans lui, l'écran propose Google Maps |
+| `VALHALLA_TIMEOUT_MS` | Délai max d'un calcul Valhalla (défaut 10 000 ms) |
 | `OSRM_BASE_URL` | Serveur de routage de repli (défaut : instance publique FOSSGIS) |
 | `OSRM_TIMEOUT_MS` / `OSRM_MIN_GAP_MS` / `OPTIMIZE_BUDGET_MS` | Réglages fins du routage (valeurs par défaut adaptées automatiquement) |
 

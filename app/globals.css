@@ -1032,6 +1032,22 @@ button {
   padding: 0;
   position: relative;
 }
+/* Export GPX : en bas de la feuille, discret, pour qui veut OsmAnd. */
+.export-gpx {
+  margin-top: 26px;
+  padding-top: 4px;
+  border-top: 1px solid var(--bord-carte);
+}
+.export-gpx .lien-sobre {
+  font-size: 13px;
+}
+.export-gpx p {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--gris);
+}
+
 .frise-ligne {
   position: absolute;
   left: 15px;
@@ -3275,6 +3291,13 @@ button {
   margin: 0 auto;
 }
 
+.nav-chargement {
+  align-items: center;
+  justify-content: center;
+  color: var(--violet);
+  font-weight: 800;
+}
+
 .nav-bandeau {
   flex: none;
   position: relative;
@@ -3375,10 +3398,22 @@ button {
   min-height: 0;
   background: #efe9dc;
 }
-.nav-map {
+/* `.nav-carte` en tête : MapLibre pose `position: relative` sur son conteneur
+   (.maplibregl-map), sa feuille de style arrive après celle-ci. */
+.nav-carte .nav-map {
   position: absolute;
   inset: 0;
   z-index: 0;
+  font-family: var(--font-sans), sans-serif;
+}
+/* Attribution OpenStreetMap / OpenFreeMap au-dessus du pied, qui mord sur la
+   carte, et à gauche des boutons ronds : dépliée, elle passe à la ligne. */
+.nav-carte .maplibregl-ctrl-bottom-left {
+  bottom: 18px;
+  right: 76px;
+}
+.nav-carte .maplibregl-ctrl-attrib {
+  font-size: 11px;
 }
 .nav-alertes {
   position: absolute;
@@ -3419,7 +3454,9 @@ button {
   color: var(--violet);
 }
 
-/* Moi : point rouge de la charte, et une flèche quand on connaît le cap. */
+/* Moi : point rouge de la charte, et une flèche quand on connaît le cap.
+   L'orientation est celle du marqueur MapLibre (setRotation) : la flèche
+   pointe toujours vers le haut de l'élément. */
 .nav-moi {
   width: 40px;
   height: 40px;
@@ -3439,8 +3476,6 @@ button {
 .nav-moi-fleche {
   position: absolute;
   inset: 0;
-  transform: rotate(var(--cap, 0deg));
-  transition: transform 0.4s ease-out;
 }
 .nav-moi-fleche::before {
   content: '';

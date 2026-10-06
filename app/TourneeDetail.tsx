@@ -2,6 +2,7 @@
 import 'leaflet/dist/leaflet.css';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { gmapsUrl, telegramUrl, type Mode } from '@/lib/maps';
+import { gpxTournee, nomFichierGpx } from '@/lib/gpx';
 import { A_REPASSER, ETAT, type EtatCourant } from '@/lib/etatsPanneau';
 import type { Mesure } from './useOptimizedOrder';
 import { useToast } from './admin/Toast';
@@ -86,6 +87,20 @@ export default function TourneeDetail({
     );
     setCollage(null);
     if (err) toast(err);
+  };
+
+  // Export GPX pour OsmAnd : généré ici, à partir des panneaux affichés et
+  // dans leur ordre de passage courant. Rien ne part au serveur.
+  const exporterGpx = () => {
+    const blob = new Blob([gpxTournee(titre, panels)], { type: 'application/gpx+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nomFichierGpx(titre);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
   };
 
   const mapEl = useRef<HTMLDivElement>(null);
@@ -274,6 +289,16 @@ export default function TourneeDetail({
             );
           })}
         </ol>
+
+        <div className="export-gpx">
+          <button type="button" className="lien-sobre" onClick={exporterGpx}>
+            Exporter vers OsmAnd (GPX)
+          </button>
+          <p>
+            Pour un guidage qui continue écran verrouillé : ouvre le fichier avec OsmAnd, puis « Naviguer par la
+            trace ». Les panneaux y sont dans l’ordre ci-dessus.
+          </p>
+        </div>
       </div>
 
       {enCours && (

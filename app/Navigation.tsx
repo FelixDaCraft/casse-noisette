@@ -2,67 +2,88 @@
 // Mode « Tournée » : navigation guidée de panneau en panneau, sans quitter
 // l'appli, et validation de chaque panneau sur place.
 //
-// Déroulé : la position est suivie en continu (watchPosition, haute
-// précision) ; le trajet vers le PROCHAIN panneau est calculé par notre OSRM
-// via /api/navigation ; le bandeau donne la prochaine manœuvre, la voix
-// l'annonce ; si l'on s'écarte du tracé quelques secondes, on recalcule. À
-// moins de ~40 m du panneau, la feuille d'arrivée propose « Collé » (la même
-// action serveur que le bouton « J'ai collé » du détail), les autres constats
-// et « Passer », puis on enchaîne sur le panneau suivant. À la fin, un
-// récapitulatif : panneaux collés, temps passé, points gagnés.
+// Moteur : Ferrostar (Stadia Maps, libre) suit le tracé, avance d'étape en
+// étape, détecte l'écart et choisit les annonces ; l'itinéraire et ses
+// consignes en français viennent de notre Valhalla, via /api/valhalla/route
+// (jamais appelé directement par le navigateur). Carte : MapLibre GL JS sur
+// un fond vectoriel OpenFreeMap, orientée dans le sens de la marche et
+// inclinée (app/carteNav.ts). Tout ce lourd (MapLibre, Ferrostar et son
+// WebAssembly) n'est chargé qu'à l'entrée dans ce mode.
+//
+// Déroulé : l'itinéraire enchaîne tous les panneaux restants, ce qui chiffre
+// la tournée entière, mais le guidage s'arrête au PROCHAIN panneau : à moins
+// de ~40 m, la feuille d'arrivée propose « Collé » (la même action serveur
+// que le bouton « J'ai collé » du détail), les autres constats et « Passer »,
+// puis on recalcule depuis là vers les suivants. Si l'on s'écarte du tracé
+// quelques secondes, on recalcule. À la fin, un récapitulatif : panneaux
+// collés, temps passé, points gagnés.
 //
 // L'ordre des panneaux est figé au démarrage : c'est celui calculé depuis le
 // point de départ du militant (useOptimizedOrder), on ne le rebat pas en route.
 
-import 'leaflet/dist/leaflet.css';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useRef, useState } from 'react';
+import type { Route, TripState } from '@stadiamaps/ferrostar';
+import type { FerrostarCore, PointDePassage } from '@stadiamaps/ferrostar-webcomponents';
 import { gmapsUrl, rueSeule, type Mode } from '@/lib/maps';
 import { ETAT, ETATS, type Etat, type EtatCourant } from '@/lib/etatsPanneau';
 import { BAREME, FENETRE_TOURNEE_H } from '@/lib/points';
 import {
-  annonce,
-  annonceDue,
-  avecSuite,
-  distanceCourte,
-  dureeCourte,
-  estSilencieuse,
-  PALIERS,
-  type Palier,
-} from '@/lib/consignes';
-import {
-  DetecteurEcart,
+  COSTING,
+  ECART_DUREE_MS,
   ECART_SEUIL_M,
-  distanceM,
-  cap as capEntre,
-  estArrive,
-  prochaineEtape,
-  projeter,
-  restant,
+  PRECISION_MAX_M,
   RAYON_ARRIVEE,
   RECALCUL_MIN_MS,
-  PRECISION_MAX_M,
-  type Projection,
+  distanceCourte,
+  distanceM,
+  dureeCourte,
+  estArrive,
+  etapeArrivee,
+  jusquAuPanneau,
+  nettoyerConsigne,
+  sansPoint,
   type Pt,
 } from '@/lib/guidage';
-import type { Trajet } from '@/lib/trajet';
 import { useToast } from './admin/Toast';
 import { useRecompense } from './Recompense';
 import { FeuilleSignalement, LigneEtat, PastilleEtat, envoyerSignalement, type Etats } from './Signalement';
 import { useWakeLock } from './useWakeLock';
 import { useVoix } from './useVoix';
+import { CarteNav } from './carteNav';
+import { PositionNav, type Fix, type Simulateur } from './positionNav';
 
 type Panel = { id: string; name: string; lat: number; lng: number };
-type Fix = { lat: number; lng: number; precision: number; cap: number | null; t: number };
 type Resultat = { etat?: Etat; passe?: boolean; points: number; tournee: number };
 type Phase = 'guidage' | 'arrivee' | 'fin';
-type TrajetPour = Trajet & { pour: string };
+type EnRoute = Extract<TripState, { Navigating: unknown }>['Navigating'];
+type Guidage =
+  | {
+      statut: 'ok';
+      pour: string;
+      route: Route;
+      /** Indice de l'étape qui arrive au prochain panneau. */
+      arrivee: number;
+      /** Panneaux suivants hors zone : le total de la tournée est incomplet. */
+      partiel: boolean;
+    }
+  | { statut: 'hors-couverture'; pour: string; horsZone: number[] }
+  | { statut: 'introuvable'; pour: string };
+
+/** Réponse non 2xx de /api/valhalla/route, avec son corps. */
+class ErreurRelais extends Error {
+  constructor(
+    readonly status: number,
+    readonly corps: { statut?: string; horsZone?: number[] } | null,
+  ) {
+    super(`relais ${status}`);
+  }
+}
 
 /** Sans nouvelle position depuis tant de secondes, on parle de signal perdu. */
 const SIGNAL_PERDU_MS = 15_000;
 /** Délai avant d'enchaîner sur le panneau suivant, le temps de voir les points. */
 const ENCHAINER_MS = 1800;
-/** Zoom de suivi selon le mode : plus large en voiture, on va plus vite. */
-const ZOOM: Record<Mode, number> = { walking: 18, bicycling: 17, driving: 16 };
 /** Hors couverture : on retente le calcul quand on a bougé d'autant. */
 const REESSAI_DEPLACEMENT_M = 300;
 
@@ -70,6 +91,34 @@ const AUTRES_ETATS = ETATS.filter((e) => e !== 'colle');
 
 const heure = (ms: number) =>
   new Date(ms).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+/**
+ * Réglages du suivi Ferrostar. Les distances sont celles d'un militant qui
+ * marche ou roule en ville : on passe à la consigne suivante une dizaine de
+ * mètres avant le carrefour (vingt-cinq en voiture), on se déclare hors du
+ * tracé au-delà de ECART_SEUIL_M, et seulement si le GPS est assez précis
+ * pour en juger.
+ */
+function reglages(mode: Mode) {
+  return {
+    stepAdvanceCondition: {
+      DistanceEntryExit: {
+        minimumHorizontalAccuracy: 30,
+        distanceToEndOfStep: mode === 'driving' ? 25 : 12,
+        distanceAfterEndStep: 5,
+        hasReachedEndOfCurrentStep: false,
+      },
+    },
+    arrivalStepAdvanceCondition: {
+      DistanceToEndOfStep: { distance: RAYON_ARRIVEE[mode] / 2, minimumHorizontalAccuracy: 30 },
+    },
+    routeDeviationTracking: {
+      StaticThreshold: { minimumHorizontalAccuracy: PRECISION_MAX_M, maxAcceptableDeviation: ECART_SEUIL_M },
+    },
+    snappedLocationCourseFiltering: 'SnapToRoute',
+    waypointAdvance: { WaypointWithinRange: RAYON_ARRIVEE[mode] },
+  };
+}
 
 /* ─── Icônes ─────────────────────────────────────────────────────────────── */
 
@@ -146,6 +195,7 @@ const IconGmaps = (
   </svg>
 );
 
+
 /* ─── Écran ──────────────────────────────────────────────────────────────── */
 
 export default function Navigation({
@@ -171,10 +221,12 @@ export default function Navigation({
   const [fix, setFix] = useState<Fix | null>(null);
   const [geo, setGeo] = useState<'attente' | 'ok' | 'refus' | 'indispo'>('attente');
   const [signalPerdu, setSignalPerdu] = useState(false);
-  const [trajet, setTrajet] = useState<TrajetPour | null>(null);
+  const [moteurPret, setMoteurPret] = useState<'attente' | 'ok' | 'echec'>('attente');
+  const [carteKo, setCarteKo] = useState(false);
+  const [guidage, setGuidage] = useState<Guidage | null>(null);
+  const [enRoute, setEnRoute] = useState<EnRoute | null>(null);
   const [calcul, setCalcul] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
-  const [proj, setProj] = useState<Projection | null>(null);
   const [suivre, setSuivre] = useState(true);
   const [resultats, setResultats] = useState<Record<string, Resultat>>({});
   const [aSignaler, setASignaler] = useState<Etat | null>(null);
@@ -190,154 +242,195 @@ export default function Navigation({
   const panneau = panels[i] as Panel | undefined;
   const total = panels.length;
 
-  // Valeurs mutables lues par les rappels du GPS (enregistrés une fois).
-  const fixRef = useRef<Fix | null>(null);
+  // Valeurs mutables lues par les rappels du GPS et de Ferrostar (enregistrés une fois).
   const iRef = useRef(i);
   iRef.current = i;
-  const segRef = useRef(0);
-  const detecteur = useRef(new DetecteurEcart());
-  const annonces = useRef(new Map<number, Palier>());
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+  const suivreRef = useRef(true);
+  suivreRef.current = suivre;
+  const fixRef = useRef<Fix | null>(null);
+  const moteur = useRef<{ core: FerrostarCore; position: PositionNav } | null>(null);
+  const carte = useRef<CarteNav | null>(null);
+  const mapEl = useRef<HTMLDivElement>(null);
   const ctrlRef = useRef<AbortController | null>(null);
   const echecs = useRef(0);
   const dernierCalcul = useRef(0);
   const posDernierCalcul = useRef<Pt | null>(null);
+  const ecartDepuis = useRef<number | null>(null);
+  /** Le tracé courant a-t-il été rejoint (au moins une position dessus) ? */
+  const rejoint = useRef(false);
+  const derniereAnnonce = useRef<string | null>(null);
+  const intro = useRef<string | null>(null);
   const arriveeIgnoree = useRef<string | null>(null);
   const horsAnnonce = useRef<string | null>(null);
   const introFaite = useRef<string | null>(null);
   const enchainement = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const guidageRef = useRef(guidage);
+  guidageRef.current = guidage;
+  const enRouteRef = useRef(enRoute);
+  enRouteRef.current = enRoute;
 
-  /* ─── Carte ─── */
-  const mapEl = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<any>(null);
-  const LRef = useRef<any>(null);
-  const calques = useRef<{ bord: any; trace: any; direct: any; panneaux: any; moi: any; halo: any } | null>(null);
-  const suivreRef = useRef(true);
-  suivreRef.current = suivre;
+  /* ─── Chargement du moteur et de la carte ─── */
 
   useEffect(() => {
     let annule = false;
-    import('leaflet').then((mod) => {
-      const L: any = (mod as any).default ?? mod;
-      if (annule || !mapEl.current || mapRef.current) return;
-      LRef.current = L;
-      const p0 = panels[0];
-      const map = L.map(mapEl.current, { zoomControl: false, attributionControl: true }).setView(
-        [p0?.lat ?? 47.218, p0?.lng ?? -1.553],
-        ZOOM[mode],
-      );
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '© OpenStreetMap',
-      }).addTo(map);
-      // Un geste sur la carte suspend le suivi : on regarde ailleurs, la
-      // carte ne doit pas nous ramener de force. « Recentrer » le relance.
-      map.on('dragstart', () => setSuivre(false));
-      calques.current = {
-        bord: L.polyline([], { color: '#fffcf4', weight: 11, opacity: 0.95, lineCap: 'round', lineJoin: 'round' }).addTo(map),
-        trace: L.polyline([], { color: '#4C0297', weight: 6, opacity: 1, lineCap: 'round', lineJoin: 'round' }).addTo(map),
-        direct: L.polyline([], { color: '#4C0297', weight: 4, opacity: 0.8, dashArray: '2 9', lineCap: 'round' }).addTo(map),
-        panneaux: L.layerGroup().addTo(map),
-        halo: L.circle([0, 0], { radius: 0, color: '#d1271c', weight: 1, opacity: 0.4, fillOpacity: 0.08, interactive: false }),
-        moi: L.marker([0, 0], {
-          icon: L.divIcon({
-            className: '',
-            html: '<div class="nav-moi sans-cap"><span class="nav-moi-fleche"></span></div>',
-            iconSize: [40, 40],
-            iconAnchor: [20, 20],
-          }),
-          interactive: false,
-          zIndexOffset: 1000,
-        }),
-      };
-      mapRef.current = map;
-      dessinerPanneaux();
-      dessinerTrajet();
-      if (fixRef.current) placerMoi(fixRef.current, true);
-    });
+    // `?simulation=1` (développement seulement) : la position suit le trajet
+    // calculé au lieu du GPS.
+    const simulation = process.env.NODE_ENV !== 'production' && new URLSearchParams(location.search).has('simulation');
+
+    Promise.all([import('maplibre-gl'), import('@stadiamaps/ferrostar-webcomponents'), import('@stadiamaps/ferrostar')])
+      .then(([ml, fs, coeur]) => {
+        if (annule) return;
+        const position = new PositionNav(
+          (f) => traiterRef.current(f),
+          (e) => setGeo((g) => (e === 'refus' ? 'refus' : g === 'ok' ? g : 'indispo')),
+          simulation ? (coeur as unknown as Simulateur) : null,
+        );
+        // FerrostarCore est un élément HTML (web component) sans rendu : on
+        // s'en sert comme d'un objet, sans l'insérer dans la page.
+        const core = new fs.FerrostarCore();
+        core.valhallaEndpointUrl = new URL('/api/valhalla/route', location.href).href;
+        core.profile = COSTING[mode];
+        core.options = { language: 'fr-FR', units: 'kilometers' };
+        core.httpClient = relais;
+        core.locationProvider = position;
+        core.useVoiceGuidance = false; // la voix passe par useVoix (voix française, bouton couper)
+        core.onTripStateChange = (ts: TripState | null) => surEtatRef.current(ts);
+        moteur.current = { core, position };
+
+        if (mapEl.current) {
+          try {
+            const p0 = panels[0];
+            carte.current = new CarteNav(ml, mapEl.current, { lat: p0?.lat ?? 47.218, lng: p0?.lng ?? -1.553 }, mode, () =>
+              setSuivre(false),
+            );
+            carte.current.map.on('error', (e: any) => console.warn('[carte]', e?.error?.message ?? e));
+            dessinerPanneaux();
+          } catch (e) {
+            // Pas de WebGL (vieux téléphone, économie d'énergie) : le guidage
+            // reste utilisable sans carte.
+            console.warn('[carte]', e);
+            setCarteKo(true);
+          }
+        }
+        setMoteurPret('ok');
+        position.start();
+        if (simulation) {
+          // Sans position émulée par le navigateur, on part à ~400 m au sud du premier panneau.
+          setTimeout(() => {
+            const p0 = panels[0];
+            if (!annule && !position.lastLocation && p0) position.placer(p0.lat - 0.0036, p0.lng);
+          }, 3500);
+        }
+      })
+      .catch((e) => {
+        console.error('[navigation]', e);
+        if (!annule) setMoteurPret('echec');
+      });
+
+    const veille = setInterval(() => {
+      const f = fixRef.current;
+      setSignalPerdu(!!f && !moteur.current?.position.simulation && Date.now() - f.t > SIGNAL_PERDU_MS);
+    }, 3000);
+
     return () => {
       annule = true;
-      mapRef.current?.remove();
-      mapRef.current = null;
-      calques.current = null;
+      clearInterval(veille);
+      if (enchainement.current) clearTimeout(enchainement.current);
+      ctrlRef.current?.abort();
+      const m = moteur.current;
+      moteur.current = null;
+      if (m) {
+        m.core.onTripStateChange = undefined;
+        if (m.core.navigationSession) m.core.stopNavigation();
+        m.position.stop();
+      }
+      carte.current?.detruire();
+      carte.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function dessinerPanneaux() {
-    const L = LRef.current;
-    const c = calques.current;
-    if (!L || !c) return;
-    c.panneaux.clearLayers();
-    panels.forEach((p, k) => {
-      const r = resultats[p.id];
-      const e = r?.etat ?? etats[p.id]?.etat;
-      const classes = ['cn-marker'];
-      if (e) classes.push(`etat-${e}`);
-      if (k === i && phase !== 'fin') classes.push('nav-cible');
-      else if (k < i || r) classes.push('nav-fait');
-      L.marker([p.lat, p.lng], {
-        icon: L.divIcon({
-          className: '',
-          html: `<div class="${classes.join(' ')}">${k + 1}</div>`,
-          iconSize: k === i ? [40, 40] : [30, 30],
-          iconAnchor: k === i ? [20, 20] : [15, 15],
-        }),
-        interactive: false,
-        zIndexOffset: k === i ? 500 : 0,
-      }).addTo(c.panneaux);
+  /** Client HTTP de Ferrostar : notre relais, annulable, qui lève une
+   *  ErreurRelais lisible au lieu de laisser Ferrostar parser une erreur. */
+  async function relais(url: URL | string, init: RequestInit): Promise<Response> {
+    const res = await fetch(url, {
+      ...init,
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      cache: 'no-store',
+      signal: ctrlRef.current?.signal,
     });
+    if (!res.ok) {
+      let corps = null;
+      try {
+        corps = await res.json();
+      } catch {}
+      throw new ErreurRelais(res.status, corps);
+    }
+    return res;
   }
 
-  function dessinerTrajet() {
-    const c = calques.current;
-    if (!c) return;
-    const f = fixRef.current;
-    if (trajet?.statut === 'ok' && trajet.pour === panneau?.id) {
-      c.bord.setLatLngs(trajet.ligne);
-      c.trace.setLatLngs(trajet.ligne);
-      c.direct.setLatLngs([]);
-    } else {
-      c.bord.setLatLngs([]);
-      c.trace.setLatLngs([]);
-      // Sans tracé fiable (hors couverture, calcul en cours) : la direction à
-      // vol d'oiseau, en pointillés, pour ne pas laisser la carte muette.
-      c.direct.setLatLngs(f && panneau && phase === 'guidage' ? [[f.lat, f.lng], [panneau.lat, panneau.lng]] : []);
-    }
-  }
+  /* ─── Carte ─── */
 
-  function placerMoi(f: Fix, centrer: boolean) {
-    const c = calques.current;
-    const map = mapRef.current;
-    if (!c || !map) return;
-    c.moi.setLatLng([f.lat, f.lng]);
-    c.halo.setLatLng([f.lat, f.lng]).setRadius(f.precision);
-    if (!map.hasLayer(c.moi)) {
-      c.halo.addTo(map);
-      c.moi.addTo(map);
-    }
-    const el: HTMLElement | null = c.moi.getElement?.()?.querySelector('.nav-moi') ?? null;
-    if (el) {
-      el.classList.toggle('sans-cap', f.cap == null);
-      if (f.cap != null) el.style.setProperty('--cap', `${Math.round(f.cap)}deg`);
-    }
-    if (centrer) map.setView([f.lat, f.lng], Math.max(map.getZoom(), ZOOM[mode] - 1), { animate: true });
+  function dessinerPanneaux() {
+    carte.current?.placerPanneaux(
+      panels.map((p, k) => {
+        const r = resultats[p.id];
+        const e = r?.etat ?? etats[p.id]?.etat;
+        const classes = ['cn-marker'];
+        if (e) classes.push(`etat-${e}`);
+        const cible = k === i && phase !== 'fin';
+        if (cible) classes.push('nav-cible');
+        else if (k < i || r) classes.push('nav-fait');
+        return { lat: p.lat, lng: p.lng, num: k + 1, classes: classes.join(' '), cible };
+      }),
+    );
   }
 
   useEffect(() => {
     dessinerPanneaux();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [i, resultats, etats, phase]);
+
+  // Tracé : celui du trajet en cours, sinon la direction à vol d'oiseau.
+  const routeAffichee = guidage?.statut === 'ok' && guidage.pour === panneau?.id && phase === 'guidage' ? guidage.route : null;
   useEffect(() => {
-    dessinerTrajet();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trajet, i, phase, fix]);
+    carte.current?.tracer(routeAffichee?.geometry ?? null);
+  }, [routeAffichee, moteurPret]);
+  // Sur un trajet, c'est le suivi Ferrostar qui gère le pointillé (jusqu'au
+  // début du tracé tant qu'on ne l'a pas rejoint).
+  useEffect(() => {
+    if (routeAffichee) return;
+    const f = fixRef.current;
+    carte.current?.directVers(phase === 'guidage' && f ? f : null, panneau ?? null);
+  }, [routeAffichee, phase, fix, panneau, moteurPret]);
+
+  // À l'arrivée, vue à plat sur le panneau et nous.
+  useEffect(() => {
+    if (phase !== 'arrivee' || !panneau) return;
+    const f = fixRef.current;
+    carte.current?.cadrer(f ? [panneau, f] : [panneau]);
+  }, [phase, panneau]);
+
+  /** Place « moi » et, si on suit, la caméra. Sur le tracé, la position
+   *  recalée sur la route (Ferrostar) : le point ne flotte pas dans les maisons. */
+  function placerMoi(pos: { lat: number; lng: number }, capDeg: number | null) {
+    const c = carte.current;
+    if (!c) return;
+    c.placerMoi(pos, capDeg);
+    if (suivreRef.current && phaseRef.current === 'guidage') c.suivre(pos, capDeg);
+  }
 
   /* ─── Itinéraire ─── */
 
   async function calculer(raison: 'depart' | 'ecart' | 'reessai') {
-    const f = fixRef.current;
-    const p = panels[iRef.current];
-    if (!f || !p) return;
+    const m = moteur.current;
+    const loc = m?.position.lastLocation;
+    const indice = iRef.current;
+    const p = panels[indice];
+    if (!m || !loc || !p || phaseRef.current !== 'guidage') return;
     const t0 = Date.now();
     if (raison !== 'depart') {
       // Anti-rebond : jamais deux appels rapprochés, et de plus en plus
@@ -349,62 +442,96 @@ export default function Navigation({
     const ctrl = new AbortController();
     ctrlRef.current = ctrl;
     dernierCalcul.current = t0;
-    posDernierCalcul.current = [f.lat, f.lng];
-    const indice = iRef.current;
+    posDernierCalcul.current = [loc.coordinates.lat, loc.coordinates.lng];
     setCalcul(true);
+
+    const restants = panels.slice(indice);
+    const etape = (q: Panel): PointDePassage => ({ coordinate: { lat: q.lat, lng: q.lng }, kind: 'Break' });
+    // Un seul calcul en vol (garde ci-dessus) : on peut libérer l'adaptateur
+    // (mémoire WebAssembly) du calcul précédent, que Ferrostar remplace sans le libérer.
+    const libererAdaptateur = () => {
+      const a = m.core.routeAdapter;
+      m.core.routeAdapter = null;
+      a?.free();
+    };
     try {
-      const r = await fetch('/api/navigation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mode,
-          points: [{ lat: f.lat, lng: f.lng }, ...panels.slice(indice).map((q) => ({ lat: q.lat, lng: q.lng }))],
-        }),
-        signal: ctrl.signal,
-      });
-      if (!r.ok) {
-        echecs.current++;
+      libererAdaptateur();
+      let routes: Route[];
+      let partiel = false;
+      try {
+        routes = await m.core.getRoutes(loc, restants.map(etape));
+      } catch (e) {
+        // Un panneau plus loin est hors zone : on guide quand même jusqu'au prochain.
+        const hz = e instanceof ErreurRelais && e.corps?.statut === 'hors-couverture' ? e.corps.horsZone ?? [] : [];
+        if (restants.length > 1 && hz.length > 0 && hz.every((k) => k >= 2)) {
+          libererAdaptateur();
+          routes = await m.core.getRoutes(loc, [etape(p)]);
+          partiel = true;
+        } else throw e;
+      }
+      if (ctrl.signal.aborted || iRef.current !== indice || phaseRef.current !== 'guidage' || moteur.current !== m) return;
+      const route = routes[0];
+      if (!route) {
+        setGuidage({ statut: 'introuvable', pour: p.id });
+        return;
+      }
+      echecs.current = 0;
+      setErreur(null);
+
+      // Premier trajet obtenu pour ce panneau : on présente la cible, en tête
+      // de la première consigne de Ferrostar.
+      const premier = introFaite.current !== p.id;
+      introFaite.current = p.id;
+      const nom = rueSeule(p.name);
+      intro.current = premier
+        ? `Direction panneau ${indice + 1}${nom ? `, ${nom}` : ''}. `
+        : raison === 'ecart'
+          ? 'Itinéraire recalculé. '
+          : null;
+      derniereAnnonce.current = null;
+      ecartDepuis.current = null;
+      rejoint.current = false;
+
+      const ancienne = m.core.navigationSession;
+      setGuidage({ statut: 'ok', pour: p.id, route, arrivee: etapeArrivee(route.steps), partiel });
+      m.core.startNavigation(route, reglages(mode));
+      ancienne?.free();
+      m.position.simuler(route);
+      // Pas de consigne à dire tout de suite : l'intro seule.
+      if (intro.current) {
+        voix.dire(intro.current.trim());
+        intro.current = null;
+      }
+    } catch (e: any) {
+      if (e?.name === 'AbortError' || ctrl.signal.aborted) return;
+      if (e instanceof ErreurRelais && e.status === 422) {
+        echecs.current = 0;
+        setErreur(null);
+        if (m.core.navigationSession) m.core.stopNavigation();
+        if (e.corps?.statut === 'hors-couverture') {
+          setGuidage({ statut: 'hors-couverture', pour: p.id, horsZone: e.corps.horsZone ?? [] });
+          if (horsAnnonce.current !== p.id) {
+            horsAnnonce.current = p.id;
+            voix.dire('Ce trajet sort de la zone couverte par notre guidage. Ouvre-le dans Google Maps.');
+          }
+        } else {
+          setGuidage({ statut: 'introuvable', pour: p.id });
+        }
+        return;
+      }
+      echecs.current++;
+      if (e instanceof ErreurRelais) {
         setErreur(
-          r.status === 401
+          e.status === 401
             ? 'Ta session a expiré : reconnecte-toi.'
-            : r.status === 429
+            : e.status === 429
               ? 'Beaucoup de recalculs : on patiente un peu.'
               : 'Calcul d’itinéraire indisponible pour l’instant.',
         );
-        return;
+      } else {
+        console.warn('[navigation]', e);
+        setErreur(navigator.onLine === false ? 'Pas de réseau : nouvel essai dans un instant.' : 'Calcul d’itinéraire indisponible pour l’instant.');
       }
-      const t = (await r.json()) as Trajet;
-      if (iRef.current !== indice) return; // on est passé au panneau suivant entre-temps
-      echecs.current = 0;
-      setErreur(null);
-      setTrajet({ ...t, pour: p.id });
-      segRef.current = 0;
-      detecteur.current.reinitialiser();
-      annonces.current.clear();
-
-      // Premier trajet obtenu pour ce panneau : on présente la cible.
-      const premier = introFaite.current !== p.id;
-      if (t.statut === 'ok') introFaite.current = p.id;
-      if (t.statut === 'ok' && (premier || raison === 'ecart')) {
-        const nom = rueSeule(p.name);
-        let txt = premier ? `Direction panneau ${indice + 1}${nom ? `, ${nom}` : ''}. ` : 'Itinéraire recalculé. ';
-        txt += t.etapes[0]?.texte ?? '';
-        // La manœuvre suivante est déjà proche : on l'annonce dans la foulée
-        // (sinon elle couperait la phrase en cours).
-        const e1 = t.etapes[1];
-        if (e1 && e1.type !== 'arrive' && e1.debut <= PALIERS[mode].loin) {
-          txt += '. ' + annonce(e1.texte, e1.debut);
-          annonces.current.set(1, e1.debut <= PALIERS[mode].proche ? 'proche' : 'loin');
-        }
-        voix.dire(txt);
-      } else if (t.statut === 'hors-couverture' && horsAnnonce.current !== p.id) {
-        horsAnnonce.current = p.id;
-        voix.dire('Ce trajet sort de la zone couverte par notre guidage. Ouvre-le dans Google Maps.');
-      }
-    } catch (e: any) {
-      if (e?.name === 'AbortError') return;
-      echecs.current++;
-      setErreur('Pas de réseau : nouvel essai dans un instant.');
     } finally {
       if (ctrlRef.current === ctrl) ctrlRef.current = null;
       setCalcul(false);
@@ -414,11 +541,62 @@ export default function Navigation({
   // Nouveau panneau visé : nouveau trajet, tout de suite.
   useEffect(() => {
     if (phase !== 'guidage') return;
-    setTrajet((t) => (t && t.pour === panels[i]?.id ? t : null));
-    setProj(null);
-    if (fixRef.current) calculer('depart');
+    setGuidage((g) => (g && g.pour === panels[i]?.id ? g : null));
+    setEnRoute(null);
+    if (moteur.current?.position.lastLocation) calculer('depart');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [i, phase]);
+  }, [i, phase, moteurPret]);
+
+  /* ─── Suivi Ferrostar : écart, voix, caméra ─── */
+
+  const surEtatRef = useRef<(ts: TripState | null) => void>(() => undefined);
+  surEtatRef.current = (ts) => {
+    if (!ts || !('Navigating' in ts)) {
+      setEnRoute(null);
+      // Fin du dernier trajet : on est au bout, donc au panneau.
+      if (ts && 'Complete' in ts && phaseRef.current === 'guidage') {
+        const f = fixRef.current;
+        if (panneau && f && distanceM([f.lat, f.lng], [panneau.lat, panneau.lng]) < RAYON_ARRIVEE[mode] * 2) arriver();
+      }
+      return;
+    }
+    const n = ts.Navigating;
+    setEnRoute(n);
+    const surLaRoute = n.deviation === 'NoDeviation';
+
+    const loc = surLaRoute ? n.snappedUserLocation : n.userLocation;
+    placerMoi(loc.coordinates, loc.courseOverGround?.degrees ?? fixRef.current?.cap ?? null);
+
+    // Écart au tracé : recalcul après quelques secondes franchement dehors
+    // (Ferrostar ne juge l'écart que si le GPS est assez précis). Tant qu'on
+    // n'a pas encore rejoint le tracé (départ d'un parc, d'une cour, d'un
+    // parking), recalculer ne changerait rien : un pointillé y mène.
+    if (surLaRoute) rejoint.current = true;
+    const g = guidageRef.current;
+    carte.current?.directVers(
+      !rejoint.current && g?.statut === 'ok' ? n.userLocation.coordinates : null,
+      g?.statut === 'ok' ? g.route.geometry[0] : null,
+    );
+    if (!surLaRoute && rejoint.current) {
+      const t = Date.now();
+      if (ecartDepuis.current == null) ecartDepuis.current = t;
+      else if (t - ecartDepuis.current >= ECART_DUREE_MS) {
+        ecartDepuis.current = null;
+        calculer('ecart');
+      }
+    } else {
+      ecartDepuis.current = null;
+    }
+
+    // Annonce vocale : Ferrostar choisit le moment, Valhalla a rédigé le texte.
+    // Loin du tracé, la consigne n'a plus de sens : on se tait jusqu'au recalcul.
+    const s = n.spokenInstruction;
+    if (s && surLaRoute && s.utteranceId !== derniereAnnonce.current) {
+      derniereAnnonce.current = s.utteranceId;
+      voix.dire((intro.current ?? '') + nettoyerConsigne(s.text));
+      intro.current = null;
+    }
+  };
 
   /* ─── Arrivée, signalement, enchaînement ─── */
 
@@ -426,6 +604,9 @@ export default function Navigation({
     if (!panneau) return;
     setPhase('arrivee');
     ctrlRef.current?.abort();
+    const m = moteur.current;
+    if (m?.core.navigationSession) m.core.stopNavigation();
+    m?.position.figer();
     voix.dire(`Panneau ${i + 1} : tu y es.`);
   }
 
@@ -444,6 +625,9 @@ export default function Navigation({
   function terminer(complete: boolean) {
     if (enchainement.current) clearTimeout(enchainement.current);
     ctrlRef.current?.abort();
+    const m = moteur.current;
+    if (m?.core.navigationSession) m.core.stopNavigation();
+    m?.position.figer();
     setFin(Date.now());
     setPhase('fin');
     voix.dire(complete ? 'Tournée terminée. Bravo et merci !' : 'Tournée arrêtée.');
@@ -490,128 +674,57 @@ export default function Navigation({
     suivant();
   }
 
-  useEffect(
-    () => () => {
-      if (enchainement.current) clearTimeout(enchainement.current);
-      ctrlRef.current?.abort();
-    },
-    [],
-  );
-
   /* ─── Position ─── */
 
-  // Traitement de chaque position : lit toujours l'état du dernier rendu.
+  // Chaque position du GPS : lit toujours l'état du dernier rendu.
   const traiterRef = useRef<(f: Fix) => void>(() => undefined);
   traiterRef.current = (f: Fix) => {
-    placerMoi(f, suivreRef.current);
-    if (phase !== 'guidage' || !panneau) return;
+    fixRef.current = f;
+    setFix(f);
+    setGeo('ok');
+    setSignalPerdu(false);
+    // Hors trajet suivi, la caméra suit la position brute ; sur un trajet,
+    // c'est l'état Ferrostar (position recalée) qui la mène.
+    if (!moteur.current?.core.navigationSession) placerMoi(f, f.cap);
+    if (phaseRef.current !== 'guidage' || !panneau) return;
     const ici: Pt = [f.lat, f.lng];
     const d = distanceM(ici, [panneau.lat, panneau.lng]);
 
     // Premier trajet, ou nouvel essai après un échec / hors couverture.
-    const trajetValide = trajet && trajet.pour === panneau.id;
-    if (!trajetValide) {
+    const g = guidageRef.current;
+    const valide = g && g.pour === panneau.id;
+    if (!valide) {
       calculer('reessai'); // sans effet si un calcul est déjà en cours
-    } else if (trajet.statut !== 'ok') {
+    } else if (g.statut !== 'ok') {
       const bouge = posDernierCalcul.current ? distanceM(ici, posDernierCalcul.current) : Infinity;
       if (bouge > REESSAI_DEPLACEMENT_M) calculer('reessai');
     } else if (erreur) {
       calculer('reessai');
     }
 
-    let restantPanneau = Infinity;
-    if (trajetValide && trajet.statut === 'ok') {
-      const p = projeter(ici, trajet.ligne, trajet.cum, segRef.current);
-      segRef.current = p.segment;
-      setProj(p);
-      restantPanneau = restant(p, trajet.cum, trajet.cumTemps).metres;
-
-      // Écart au tracé : recalcul après quelques secondes franchement dehors.
-      if (detecteur.current.observer(p.ecart, f.precision, f.t)) calculer('ecart');
-
-      // Annonces vocales de la prochaine manœuvre.
-      const debuts = trajet.etapes.map((e) => e.debut);
-      const k = prochaineEtape(debuts, p.parcouru);
-      const etape = trajet.etapes[k];
-      // Loin du tracé, la « prochaine manœuvre » n'a plus de sens : on se tait
-      // jusqu'au recalcul.
-      if (etape && k > 0 && p.ecart <= ECART_SEUIL_M) {
-        const dist = etape.debut - p.parcouru;
-        const longueur = etape.debut - (trajet.etapes[k - 1]?.debut ?? 0);
-        const due = estSilencieuse(etape.type, etape.modifier)
-          ? null
-          : annonceDue(mode, dist, annonces.current.get(k) ?? null, longueur);
-        if (due) {
-          annonces.current.set(k, due);
-          const apres = trajet.etapes[k + 1];
-          const suite =
-            apres && apres.type !== 'arrive' && apres.debut - etape.debut < PALIERS[mode].proche * 1.5 ? apres.texte : null;
-          // La manœuvre enchaînée vient d'être dite : pas d'annonce « loin » en plus.
-          if (suite && !annonces.current.has(k + 1)) annonces.current.set(k + 1, 'loin');
-          const texte = avecSuite(etape.texte, suite);
-          voix.dire(due === 'loin' ? annonce(texte, dist) : texte);
-        }
-      }
+    // Reste jusqu'au panneau sur le tracé (état Ferrostar du dernier fix).
+    let resteTrace = Infinity;
+    const n = enRouteRef.current;
+    if (valide && g.statut === 'ok' && n) {
+      const courante = g.route.steps.length - n.remainingSteps.length;
+      resteTrace = jusquAuPanneau(g.route.steps, g.arrivee, courante, n.progress.distanceToNextManeuver).metres;
     }
 
     // Arrivée : dans le rayon du panneau, ou au bout du tracé tout près.
     if (arriveeIgnoree.current === panneau.id) {
       if (d > RAYON_ARRIVEE[mode] * 2) arriveeIgnoree.current = null;
-    } else if (f.precision <= 100 && (estArrive(d, mode) || (restantPanneau < 10 && d < RAYON_ARRIVEE[mode] * 2))) {
+    } else if (f.precision <= 100 && (estArrive(d, mode) || (resteTrace < 10 && d < RAYON_ARRIVEE[mode] * 2))) {
       arriver();
     }
   };
 
-  useEffect(() => {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      setGeo('indispo');
-      return;
-    }
-    let precedent: Fix | null = null;
-    const id = navigator.geolocation.watchPosition(
-      (pos) => {
-        const c = pos.coords;
-        const t = pos.timestamp || Date.now();
-        // Cap : celui du GPS quand on avance, sinon déduit des deux dernières
-        // positions (au moins 4 m d'écart, en dessous c'est du bruit).
-        let cap: number | null = null;
-        if (c.heading != null && Number.isFinite(c.heading) && (c.speed ?? 0) > 0.5) cap = c.heading;
-        else if (precedent) {
-          const dep = distanceM([precedent.lat, precedent.lng], [c.latitude, c.longitude]);
-          cap = dep >= 4 ? capEntre([precedent.lat, precedent.lng], [c.latitude, c.longitude]) : precedent.cap;
-        }
-        const f: Fix = { lat: c.latitude, lng: c.longitude, precision: c.accuracy, cap, t };
-        if (!precedent || distanceM([precedent.lat, precedent.lng], [f.lat, f.lng]) >= 4 || cap !== precedent.cap) {
-          precedent = f;
-        }
-        fixRef.current = f;
-        setFix(f);
-        setGeo('ok');
-        setSignalPerdu(false);
-        traiterRef.current(f);
-      },
-      (err) => {
-        if (err.code === err.PERMISSION_DENIED) setGeo('refus');
-        else if (err.code === err.POSITION_UNAVAILABLE) setGeo((g) => (g === 'ok' ? g : 'indispo'));
-        // TIMEOUT : on continue d'écouter, la veille « signal perdu » prend le relais.
-      },
-      { enableHighAccuracy: true, maximumAge: 1000, timeout: 20_000 },
-    );
-    const veille = setInterval(() => {
-      const f = fixRef.current;
-      setSignalPerdu(!!f && Date.now() - f.t > SIGNAL_PERDU_MS);
-    }, 3000);
-    return () => {
-      navigator.geolocation.clearWatch(id);
-      clearInterval(veille);
-    };
-  }, []);
-
   const recentrer = () => {
     setSuivre(true);
     const f = fixRef.current;
-    const map = mapRef.current;
-    if (f && map) map.setView([f.lat, f.lng], ZOOM[mode], { animate: true });
+    if (!f || !carte.current) return;
+    const n = enRouteRef.current;
+    const loc = n && n.deviation === 'NoDeviation' ? n.snappedUserLocation.coordinates : f;
+    carte.current.suivre(loc, n?.snappedUserLocation.courseOverGround?.degrees ?? f.cap);
   };
 
   /* ─── Rendu ─── */
@@ -636,39 +749,48 @@ export default function Navigation({
     );
   }
 
-  const trajetOk = trajet && trajet.pour === panneau?.id && trajet.statut === 'ok' ? trajet : null;
-  const horsZone = trajet && trajet.pour === panneau?.id && trajet.statut === 'hors-couverture' ? trajet : null;
-  const introuvable = trajet && trajet.pour === panneau?.id && trajet.statut === 'introuvable';
+  const g = guidage && guidage.pour === panneau?.id ? guidage : null;
+  const routeOk = g?.statut === 'ok' ? g : null;
+  const horsZone = g?.statut === 'hors-couverture' ? g : null;
+  const introuvable = g?.statut === 'introuvable';
   const dVol = fix && panneau ? distanceM([fix.lat, fix.lng], [panneau.lat, panneau.lng]) : null;
 
   // Ce qui reste jusqu'au panneau, puis pour toute la tournée.
   let resteM: number | null = null;
   let resteS: number | null = null;
+  let tourneeM: number | null = null;
+  let tourneeS: number | null = null;
   let prochaine: { type: string; modifier?: string; texte: string; dist: number; suite: string | null } | null = null;
-  if (trajetOk) {
-    const p = proj ?? { ecart: 0, segment: 0, t: 0, parcouru: 0 };
-    const r = restant(p, trajetOk.cum, trajetOk.cumTemps);
+  if (routeOk && enRoute) {
+    const etapes = routeOk.route.steps;
+    const courante = etapes.length - enRoute.remainingSteps.length;
+    const r = jusquAuPanneau(etapes, routeOk.arrivee, courante, enRoute.progress.distanceToNextManeuver);
     resteM = r.metres;
     resteS = r.secondes;
-    const k = prochaineEtape(trajetOk.etapes.map((e) => e.debut), p.parcouru);
-    const e = trajetOk.etapes[k];
-    if (e) {
-      const apres = trajetOk.etapes[k + 1];
-      prochaine = {
-        type: e.type,
-        modifier: e.modifier,
-        texte: e.texte,
-        dist: Math.max(0, e.debut - p.parcouru),
-        suite: apres ? apres.texte : null,
-      };
-    }
+    tourneeM = enRoute.progress.distanceRemaining;
+    tourneeS = enRoute.progress.durationRemaining;
+    // La manœuvre qui vient est décrite par l'étape qui la suit (« Tournez à
+    // gauche dans la rue X ») ; la flèche, par la consigne visuelle en cours.
+    // Loin de la manœuvre (ou loin du tracé), Ferrostar n'a pas encore de
+    // consigne visuelle « active » : on prend celle de l'étape.
+    const vi = (enRoute.visualInstruction ?? enRoute.remainingSteps[0]?.visualInstructions[0])?.primaryContent;
+    const apres = enRoute.remainingSteps[1];
+    const ensuite = courante + 1 < routeOk.arrivee ? enRoute.remainingSteps[2] : undefined;
+    prochaine = {
+      type: courante >= routeOk.arrivee ? 'arrive' : (vi?.maneuverType ?? 'continue'),
+      modifier: vi?.maneuverModifier,
+      texte: sansPoint(apres?.instruction ?? enRoute.remainingSteps[0]?.instruction ?? ''),
+      dist: Math.max(0, enRoute.progress.distanceToNextManeuver),
+      suite: ensuite ? sansPoint(ensuite.instruction) : null,
+    };
   } else if (dVol != null) {
     resteM = dVol;
   }
-  const suite = (trajet && trajet.pour === panneau?.id && trajet.statut !== 'introuvable' ? trajet.suite : []) ?? [];
-  const tourneeM = resteM != null ? resteM + suite.reduce((s, j) => s + j.metres, 0) : null;
-  const tourneeS = resteS != null ? resteS + suite.reduce((s, j) => s + j.secondes, 0) : null;
-  const tourneeApprox = suite.some((j) => j.horsCouverture) || !trajetOk;
+  const tourneeApprox = !routeOk || routeOk.partiel || !enRoute;
+  if (tourneeM == null && resteM != null && total - i > 1) {
+    // Sans trajet : la tournée à vol d'oiseau, panneau après panneau.
+    tourneeM = panels.slice(i + 1).reduce((s, p, k) => s + distanceM([panels[i + k].lat, panels[i + k].lng], [p.lat, p.lng]), resteM);
+  }
 
   const gmapsTrajet = panneau ? gmapsUrl([panneau], mode) : '#';
   const precisionFaible = fix && fix.precision > PRECISION_MAX_M;
@@ -676,8 +798,10 @@ export default function Navigation({
   const alertes: { cle: string; texte: string; ton: 'alerte' | 'neutre' }[] = [];
   if (signalPerdu) alertes.push({ cle: 'signal', texte: 'Signal GPS perdu : position figée', ton: 'alerte' });
   else if (precisionFaible) alertes.push({ cle: 'precision', texte: `Précision faible (± ${Math.round(fix!.precision)} m)`, ton: 'alerte' });
-  if (calcul && trajetOk) alertes.push({ cle: 'calcul', texte: 'Recalcul de l’itinéraire…', ton: 'neutre' });
-  if (erreur && trajetOk) alertes.push({ cle: 'erreur', texte: erreur, ton: 'alerte' });
+  if (calcul && routeOk) alertes.push({ cle: 'calcul', texte: 'Recalcul de l’itinéraire…', ton: 'neutre' });
+  if (erreur && routeOk) alertes.push({ cle: 'erreur', texte: erreur, ton: 'alerte' });
+  if (carteKo) alertes.push({ cle: 'carte', texte: 'Carte indisponible sur ce téléphone : suis les consignes', ton: 'neutre' });
+  if (moteur.current?.position.simulation) alertes.push({ cle: 'simu', texte: 'Simulation (développement)', ton: 'neutre' });
   if (ecran === 'non-supporte') alertes.push({ cle: 'ecran', texte: 'Écran : garde-le allumé toi-même (non géré ici)', ton: 'neutre' });
   else if (ecran === 'refuse') alertes.push({ cle: 'ecran', texte: 'L’écran peut se mettre en veille (économie d’énergie)', ton: 'neutre' });
 
@@ -687,7 +811,18 @@ export default function Navigation({
         <button type="button" className="nav-fermer" onClick={() => terminer(false)} aria-label="Arrêter la tournée">
           {IconFermer}
         </button>
-        {geo === 'refus' ? (
+        {moteurPret === 'echec' ? (
+          <div className="nav-consigne">
+            <div className="nav-consigne-txt">
+              <b>Guidage indisponible</b>
+              <span>Le guidage n’a pas pu se charger (réseau ?). Tu peux quand même valider chaque panneau.</span>
+              <a className="nav-gmaps-fort" href={gmapsTrajet} target="_blank" rel="noopener">
+                {IconGmaps}
+                Ouvrir dans Google Maps
+              </a>
+            </div>
+          </div>
+        ) : geo === 'refus' ? (
           <div className="nav-consigne">
             <div className="nav-consigne-txt">
               <b>Localisation refusée</b>
@@ -704,7 +839,7 @@ export default function Navigation({
         ) : !fix ? (
           <div className="nav-consigne">
             <div className="nav-consigne-txt">
-              <b>Recherche de ta position…</b>
+              <b>{moteurPret === 'attente' ? 'Préparation du guidage…' : 'Recherche de ta position…'}</b>
               <span>Sors à découvert si ça dure.</span>
             </div>
           </div>
@@ -723,8 +858,8 @@ export default function Navigation({
             <div className="nav-consigne-txt">
               <b>Hors de la zone guidée</b>
               <span>
-                {horsZone.horsZone.includes(0) ? 'Tu es' : 'Ce panneau est'} hors de la zone couverte par notre GPS
-                (Loire-Atlantique) : pas de consignes fiables pour ce trajet.
+                {horsZone.horsZone.includes(0) ? 'Tu es hors' : horsZone.horsZone.includes(1) ? 'Ce panneau est hors' : 'Ce trajet sort'} de
+                la zone couverte par notre GPS : pas de consignes fiables pour ce trajet.
               </span>
               <a className="nav-gmaps-fort" href={gmapsTrajet} target="_blank" rel="noopener">
                 {IconGmaps}
@@ -792,7 +927,7 @@ export default function Navigation({
               <IconVoix active={voix.active} />
             </button>
           )}
-          {!suivre && fix && (
+          {!suivre && fix && phase === 'guidage' && (
             <button type="button" className="rond" onClick={recentrer} aria-label="Recentrer sur ma position">
               {IconViser}
             </button>
@@ -818,7 +953,7 @@ export default function Navigation({
               </span>
             </span>
           </div>
-          {total > 1 && tourneeM != null && (
+          {total - i > 1 && tourneeM != null && (
             <p className="nav-tournee">
               Toute la tournée : {tourneeApprox ? '≈ ' : ''}
               {distanceCourte(tourneeM)}
@@ -872,6 +1007,7 @@ export default function Navigation({
               className="lien-sobre"
               onClick={() => {
                 arriveeIgnoree.current = panneau.id;
+                setSuivre(true);
                 setPhase('guidage');
               }}
             >

@@ -8,6 +8,15 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   eslint: { ignoreDuringBuilds: true },
+  webpack: (config) => {
+    // Le cœur de Ferrostar (mode « Tournée ») est du WebAssembly importé comme
+    // un module ES (@stadiamaps/ferrostar, généré par wasm-pack).
+    config.experiments = { ...config.experiments, asyncWebAssembly: true };
+    // Le chargeur du wasm est en async/await, que tous les navigateurs visés
+    // (ceux qui ont WebAssembly) connaissent : sans ça, webpack s'en inquiète.
+    config.output.environment = { ...config.output.environment, asyncFunction: true };
+    return config;
+  },
   async headers() {
     return [
       {
