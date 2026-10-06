@@ -296,16 +296,18 @@ export function bilan(gains: Gain[]): Bilan {
 
 export type Niveau = { rang: number; nom: string; seuil: number };
 
-/** Niveaux, sur les points de la campagne. Des paliers qui s'espacent : le
- *  premier vient en une soirée (une tournée de 10 panneaux : 170 points), le
- *  dernier en une campagne d'engagement régulier. */
+/** Niveaux, sur les points de la campagne, nommés d'après le folklore insoumis.
+ *  Des paliers qui s'espacent : le premier vient en une soirée (une tournée de
+ *  10 panneaux : 170 points), le dernier en une campagne d'engagement régulier. */
 export const NIVEAUX: Niveau[] = [
-  { rang: 1, nom: 'Pinceau neuf', seuil: 0 },
-  { rang: 2, nom: 'Seau de colle', seuil: 100 },
-  { rang: 3, nom: 'Colleur·se de quartier', seuil: 300 },
-  { rang: 4, nom: 'Brigade du soir', seuil: 800 },
-  { rang: 5, nom: 'Mur rouge', seuil: 1800 },
-  { rang: 6, nom: 'Légende du pinceau', seuil: 3500 },
+  { rang: 1, nom: 'Lait-Fraise', seuil: 0 },
+  { rang: 2, nom: 'Pot de colle', seuil: 100 },
+  { rang: 3, nom: 'Mouvement gazeux', seuil: 250 },
+  { rang: 4, nom: 'Pilier de boucle Telegram', seuil: 500 },
+  { rang: 5, nom: 'Hologramme', seuil: 900 },
+  { rang: 6, nom: 'La République, c’est moi', seuil: 1500 },
+  { rang: 7, nom: 'Tribun·e du peuple', seuil: 2400 },
+  { rang: 8, nom: 'Tortue sagace', seuil: 3500 },
 ];
 
 export function niveau(points: number) {
