@@ -70,7 +70,21 @@ lance directement en navigation GPS, plus un vrai outil de gestion derrière.
   de son groupe et de son département** (« Prénom N. »), jamais nationaux ; périodes
   semaine / mois / campagne. Petite récompense animée après un collage (immobile avec
   `prefers-reduced-motion`).
-- 🗺️ **Google Maps** — itinéraire multi-arrêts + **lancement direct du GPS** (`dir_action=navigate`), toujours depuis la position de l'utilisateur.
+- 🧭 **Mode « Tournée » : navigation guidée dans l'appli** — « Démarrer la tournée » ouvre un
+  écran plein écran qui guide de panneau en panneau (ordre figé au départ) : carte qui suit
+  la position, tracé jusqu'au prochain panneau, bandeau « Dans 200 m, tourne à droite sur
+  la rue X », distance et durée restantes (panneau et tournée), voix française
+  (désactivable), recalcul automatique si l'on s'écarte du tracé (≥ 45 m pendant 4 s,
+  jamais plus d'un calcul toutes les 10 s), écran maintenu allumé (Wake Lock). À moins de
+  40 m (50 m en voiture), la feuille d'arrivée propose **Collé** (même action que « J'ai
+  collé »), les autres constats et « Passer », puis enchaîne ; récapitulatif à la fin
+  (collés, temps, points). Itinéraires et consignes viennent de **notre OSRM** via
+  `POST /api/navigation` (session militant, OSRM jamais exposé au navigateur) ; consignes
+  en français dans `lib/consignes.ts`, géométrie dans `lib/guidage.ts`
+  (`node --test scripts/tester-navigation.mjs`). Notre OSRM ne couvre que la
+  Loire-Atlantique : un point accroché à plus de 300 m de la route est déclaré **hors
+  couverture** et l'écran propose Google Maps au lieu d'un faux guidage.
+- 🗺️ **Google Maps** — itinéraire multi-arrêts + **lancement direct du GPS** (`dir_action=navigate`), toujours depuis la position de l'utilisateur ; reste proposé en secours pour chaque trajet du mode Tournée.
 - 📨 **Partage Telegram** par itinéraire.
 - 🚶🚲🚗 Sélecteur de mode + option « depuis ma position ».
 - 💎 Charte LFI 2027 (violet, rouge, crème ; *Public Sans* + *Gowun Batang*).

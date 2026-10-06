@@ -87,6 +87,7 @@ export function FeuilleSignalement({
   onSignale,
   onRecompense,
   onFermer,
+  initial = null,
 }: {
   panneau: { id: string; name: string; num: number };
   courant?: EtatCourant;
@@ -94,8 +95,10 @@ export function FeuilleSignalement({
   onSignale: (panelId: string, e: EtatCourant) => void;
   onRecompense?: (r: Recompense | null, etat: Etat) => void;
   onFermer: () => void;
+  /** État déjà choisi à l'ouverture (écran de navigation : on a touché « Tagué »). */
+  initial?: Etat | null;
 }) {
-  const [choix, setChoix] = useState<Etat | null>(null);
+  const [choix, setChoix] = useState<Etat | null>(initial);
   const [commentaire, setCommentaire] = useState('');
   const [erreur, setErreur] = useState<string | null>(null);
   const [envoi, demarrer] = useTransition();

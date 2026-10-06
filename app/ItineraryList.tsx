@@ -7,6 +7,8 @@ import { useOptimizedOrder, type Status, type Mesure } from './useOptimizedOrder
 import { useFavoris } from './useFavoris';
 import Marque, { DuoVioletDef } from './Marque';
 import TourneeDetail, { type NoteOrdre } from './TourneeDetail';
+import Navigation from './Navigation';
+import { debloquerVoix } from './useVoix';
 import HdMoi from './HdMoi';
 import { fraicheur, type EtatCourant } from '@/lib/etatsPanneau';
 import { bilan, type Etats } from './Signalement';
@@ -250,6 +252,16 @@ export default function ItineraryList({
     if (typeof history !== 'undefined' && history.state?.cnDetail) history.back();
     else setOuverte(null);
   }, []);
+
+  // Mode « Tournée » (navigation guidée) : une vue de plus par-dessus le
+  // détail, avec son entrée d'historique — le retour du téléphone en sort.
+  // Panneaux, titre et mode sont figés au démarrage : l'ordre de passage ne
+  // se rebat pas en route.
+  const [navigation, setNavigation] = useState<{ titre: string; panels: Panel[]; mode: Mode } | null>(null);
+  const quitterNavigation = useCallback(() => {
+    if (typeof history !== 'undefined' && history.state?.cnNav) history.back();
+    else setNavigation(null);
+  }, []);
   const ouvrir = useCallback((id: string) => {
     placeDansListe.current = scrollY;
     setOuverte(id);
@@ -257,7 +269,11 @@ export default function ItineraryList({
     scrollTo(0, 0);
   }, []);
   useEffect(() => {
-    const onPop = () => setOuverte(null);
+    const onPop = () => {
+      const s = history.state;
+      if (!s?.cnNav) setNavigation(null);
+      if (!s?.cnDetail) setOuverte(null);
+    };
     addEventListener('popstate', onPop);
     return () => removeEventListener('popstate', onPop);
   }, []);
@@ -305,6 +321,20 @@ export default function ItineraryList({
           ? { texte: 'Optimisé depuis ta position', ton: 'ok' }
           : { texte: 'Ordre par défaut', ton: 'neutre' };
 
+    if (navigation) {
+      return (
+        <Navigation
+          titre={navigation.titre}
+          panels={navigation.panels}
+          mode={navigation.mode}
+          etats={etats}
+          maintenant={maintenant}
+          onSignale={onSignale}
+          onQuitter={quitterNavigation}
+        />
+      );
+    }
+
     return (
       <div className="page">
         <DuoVioletDef />
@@ -320,6 +350,11 @@ export default function ItineraryList({
           maintenant={maintenant}
           onSignale={onSignale}
           onRetour={fermer}
+          onDemarrer={() => {
+            debloquerVoix();
+            setNavigation({ titre, panels, mode });
+            history.pushState({ cnDetail: true, cnNav: true }, '');
+          }}
           modes={MODES.map((m) => (
             <button
               key={m}

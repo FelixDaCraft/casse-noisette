@@ -3220,3 +3220,498 @@ button {
     animation: none;
   }
 }
+
+/* ─── Mode « Tournée » : navigation guidée ──────────────────────────────────
+   Plein écran, mobile d'abord, au pouce : la consigne en haut sur le violet
+   de la charte, la carte au milieu, la cible et les gestes en bas. */
+
+/* Détail : « Démarrer la tournée » en rouge, Google Maps en secours à côté. */
+.cta-double {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.cta-double .cta {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 15px;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+.cta-gmaps {
+  flex: none;
+  height: 60px;
+  padding: 0 16px;
+  border-radius: var(--pill);
+  background: var(--blanc);
+  border: 1.5px solid var(--bord-champ);
+  color: var(--charbon);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+  text-align: center;
+  line-height: 1.15;
+  max-width: 84px;
+}
+.cta-gmaps:hover {
+  color: var(--violet);
+  border-color: var(--violet);
+}
+
+.nav {
+  position: fixed;
+  inset: 0;
+  z-index: 800;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  background: var(--creme);
+  max-width: var(--largeur-public);
+  margin: 0 auto;
+}
+
+.nav-bandeau {
+  flex: none;
+  position: relative;
+  z-index: 2;
+  background: var(--violet);
+  color: var(--creme);
+  padding: calc(12px + env(safe-area-inset-top)) 16px 16px 66px;
+  min-height: 96px;
+  box-shadow: 0 6px 18px rgba(76, 2, 151, 0.25);
+}
+.nav-fermer {
+  position: absolute;
+  left: 12px;
+  top: calc(14px + env(safe-area-inset-top));
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(255, 252, 244, 0.14);
+  color: var(--creme);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.nav-fermer:active {
+  transform: scale(0.95);
+}
+.nav-consigne {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 68px;
+}
+.nav-fleche {
+  flex: none;
+  width: 60px;
+  height: 60px;
+  border-radius: 16px;
+  background: var(--creme);
+  color: var(--violet);
+  display: grid;
+  place-items: center;
+}
+.nav-consigne-txt {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.nav-dist {
+  font-size: 30px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.nav-consigne-txt b {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+.nav-consigne-txt > span:not(.nav-dist) {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  opacity: 0.9;
+}
+.nav-puis {
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+.nav-gmaps-fort {
+  align-self: flex-start;
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--pill);
+  background: var(--rouge);
+  color: #fff;
+  font-weight: 900;
+  font-size: 13px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-decoration: none;
+  box-shadow: var(--ombre-cta);
+}
+.nav-gmaps-fort:hover {
+  background: var(--rouge-hover);
+  color: #fff;
+}
+
+.nav-carte {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: #efe9dc;
+}
+.nav-map {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+.nav-alertes {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  z-index: 500;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  pointer-events: none;
+}
+.nav-alerte {
+  padding: 6px 12px;
+  border-radius: var(--pill);
+  font-size: 12px;
+  font-weight: 800;
+  box-shadow: var(--ombre-flottant);
+}
+.nav-alerte.alerte {
+  background: var(--alerte-fond);
+  color: var(--alerte-txt);
+}
+.nav-alerte.neutre {
+  background: var(--blanc);
+  color: var(--charbon);
+}
+.nav-boutons {
+  position: absolute;
+  right: 12px;
+  bottom: 14px;
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.nav-boutons .rond.actif {
+  color: var(--violet);
+}
+
+/* Moi : point rouge de la charte, et une flèche quand on connaît le cap. */
+.nav-moi {
+  width: 40px;
+  height: 40px;
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+.nav-moi::before {
+  content: '';
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--rouge);
+  border: 3px solid #fff;
+  box-shadow: 0 2px 6px rgba(33, 35, 32, 0.35);
+}
+.nav-moi-fleche {
+  position: absolute;
+  inset: 0;
+  transform: rotate(var(--cap, 0deg));
+  transition: transform 0.4s ease-out;
+}
+.nav-moi-fleche::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  transform: translateX(-50%);
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 13px solid var(--rouge);
+  filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 1px #fff);
+}
+.nav-moi.sans-cap .nav-moi-fleche {
+  display: none;
+}
+
+/* Panneau visé : plus gros, cerclé de rouge ; ceux déjà vus s'effacent. */
+.cn-marker.nav-cible {
+  width: 40px;
+  height: 40px;
+  font-size: 15px;
+  border-width: 3px;
+  box-shadow: 0 0 0 4px rgba(209, 39, 28, 0.35), 0 2px 8px rgba(33, 35, 32, 0.35);
+}
+.cn-marker.nav-fait {
+  opacity: 0.55;
+}
+
+.nav-pied {
+  flex: none;
+  position: relative;
+  z-index: 2;
+  margin-top: -18px;
+  background: var(--creme);
+  border-radius: var(--r-feuille) var(--r-feuille) 0 0;
+  padding: 16px 16px calc(12px + env(safe-area-inset-bottom));
+  box-shadow: 0 -6px 20px rgba(33, 35, 32, 0.12);
+}
+.nav-cible-ligne {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.nav-cible-txt {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.nav-cible-nom {
+  font-weight: 800;
+  font-size: 16px;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nav-cible-meta {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gris);
+}
+.nav-cible-meta b {
+  color: var(--violet);
+  font-weight: 900;
+}
+.nav-tournee {
+  margin: 8px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--gris);
+}
+.nav-gestes {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.nav-arrive {
+  flex: 1;
+  height: 52px;
+  border: 0;
+  border-radius: var(--pill);
+  background: var(--violet);
+  color: var(--creme);
+  font-family: inherit;
+  font-weight: 900;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.nav-arrive:hover {
+  background: var(--violet-hover);
+}
+.nav-arrive:active {
+  transform: scale(0.98);
+}
+.nav-gestes .geste {
+  height: 52px;
+  padding: 0 20px;
+  font-size: 14px;
+}
+.nav-gmaps {
+  margin: 10px auto 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: fit-content;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--gris);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Arrivée : la feuille du bas grandit, « Collé » en grand sous le pouce. */
+.nav-arrivee {
+  max-height: 70dvh;
+  overflow-y: auto;
+  animation: monte 0.22s ease-out;
+}
+.nav-note {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--r-champ);
+  background: var(--alerte-fond);
+  color: var(--alerte-txt);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.nav-colle {
+  margin-top: 14px;
+  width: 100%;
+  height: 68px;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 20px;
+}
+.nav-colle[disabled] {
+  opacity: 0.7;
+  cursor: default;
+}
+.nav-etats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 12px;
+}
+.nav-etat {
+  min-height: 44px;
+  padding: 6px 8px;
+  border-radius: 12px;
+  border: 1.5px solid var(--bord-carte);
+  background: var(--blanc);
+  color: var(--charbon);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.15;
+  text-align: left;
+  cursor: pointer;
+}
+.nav-etat:active {
+  transform: scale(0.97);
+}
+.nav-etat .pastille-etat {
+  width: 14px;
+  height: 14px;
+}
+.nav-arrivee-pied {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+}
+.nav-arrivee-pied .lien-sobre {
+  margin: 0;
+}
+.nav-passer {
+  height: 44px;
+  padding: 0 20px;
+}
+
+/* Récompense et toast : sous le bandeau, la feuille du bas est occupée. */
+.nav .recompense,
+.nav .toast {
+  bottom: auto;
+  top: calc(120px + env(safe-area-inset-top));
+}
+
+/* Récapitulatif de fin de tournée. */
+.nav-fin {
+  overflow-y: auto;
+}
+.nav-fin-corps {
+  padding: calc(28px + env(safe-area-inset-top)) 18px calc(24px + env(safe-area-inset-bottom));
+}
+.nav-bonus {
+  margin: 14px 0 0;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--violet);
+  color: var(--creme);
+  font-size: 15px;
+  font-weight: 600;
+}
+.nav-bonus b {
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.nav-regle {
+  margin: 14px 2px 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--gris);
+}
+.nav-bilan {
+  list-style: none;
+  margin: 20px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.nav-bilan li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--blanc);
+  border: 1px solid var(--bord-carte);
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+.nav-bilan-txt {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.nav-bilan-etat {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--gris);
+}
+.nav-fin-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 22px;
+}
+.nav-fin-actions .cta {
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+.nav-fin-actions .geste {
+  height: 48px;
+  justify-content: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-arrivee,
+  .nav-moi-fleche {
+    animation: none;
+    transition: none;
+  }
+}

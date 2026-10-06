@@ -51,6 +51,7 @@ export default function TourneeDetail({
   maintenant,
   onSignale,
   onRetour,
+  onDemarrer,
 }: {
   titre: string;
   kicker: string;
@@ -65,6 +66,8 @@ export default function TourneeDetail({
   maintenant: number;
   onSignale: (panelId: string, e: EtatCourant) => void;
   onRetour: () => void;
+  /** Lance le mode « Tournée » : navigation guidée dans l'appli. */
+  onDemarrer: () => void;
 }) {
   // Panneau dont la feuille de signalement est ouverte. Son id, pas son
   // indice : l'ordre de passage se recalcule (position affinée, changement de
@@ -292,12 +295,17 @@ export default function TourneeDetail({
       {recompenseEl ?? toastEl}
 
       <div className="cta-zone">
-        <div className="cta-inner">
-          <a className="cta" href={url} target="_blank" rel="noopener">
+        <div className="cta-inner cta-double">
+          {/* Le guidage se fait dans l'appli ; Google Maps reste à portée en
+              secours (hors zone couverte, préférence personnelle). */}
+          <button type="button" className="cta" onClick={onDemarrer}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22 }}>
               <polygon points="3 11 22 2 13 21 11 13 3 11" />
             </svg>
-            Lancer le GPS
+            Démarrer la tournée
+          </button>
+          <a className="cta-gmaps" href={url} target="_blank" rel="noopener" aria-label="Ouvrir dans Google Maps">
+            Google Maps
           </a>
         </div>
       </div>
