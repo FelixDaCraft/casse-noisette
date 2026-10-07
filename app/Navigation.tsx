@@ -254,6 +254,7 @@ function DiagBoussole({ mode, vitesse, gps, position, precisionFix }: {
         `perm    ${d.permission}`,
         `écoute  ${d.ecoute}`,
         `évts    ${d.evenements}  source ${d.source}`,
+        `angles  ${d.angles}${d.precisionIos == null ? '' : `  précision iOS ±${Math.round(d.precisionIos)}°`}`,
         `brut    ${d.brut == null ? '-' : Math.round(d.brut)}°  écran ${d.angleEcran}°  cap ${d.cap ?? '-'}°`,
         `mode    ${mode}  vitesse ${vitesse == null ? '-' : vitesse.toFixed(1)} m/s  → ${gps ? 'cap GPS' : 'boussole'}`,
         `gps     ± ${precisionFix == null ? '-' : Math.round(precisionFix)} m  recalage ${position ? Math.round(position.ecart) + ' m' + (position.ecart <= RECALAGE_MAX_M[mode] && position.precision <= RECALAGE_PRECISION_MAX_M ? ' (retenu)' : ' (ignoré)') : '-'}`,

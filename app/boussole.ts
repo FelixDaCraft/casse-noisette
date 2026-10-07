@@ -31,6 +31,8 @@ export const diagBoussole = {
   brut: null as number | null,
   cap: null as number | null,
   angleEcran: 0,
+  angles: '-' as string,
+  precisionIos: null as number | null,
 };
 
 /**
@@ -66,6 +68,29 @@ export function demanderBoussole(): void {
 const rad = (d: number) => (d * Math.PI) / 180;
 const deg = (r: number) => (r * 180) / Math.PI;
 const norm = (d: number) => ((d % 360) + 360) % 360;
+
+/**
+ * Cap à partir des angles d'Euler (repère W3C : X est, Y nord, Z haut ;
+ * rotations intrinsèques Z-X'-Y'' d'angles alpha, beta, gamma).
+ *
+ * `360 − alpha` n'est juste que téléphone à plat : tenu incliné comme pour
+ * naviguer, la flèche déviait. On projette deux axes du téléphone sur
+ * l'horizontale : son haut (Y), qui donne le cap à plat mais s'écrase quand on
+ * le redresse, et son dos (−Z, la formule de la spécification W3C), qui donne
+ * le cap redressé mais s'annule à plat. Leur somme, non normalisée, passe de
+ * l'un à l'autre en douceur : le cap est celui où l'on regarde, quelle que
+ * soit la tenue du téléphone.
+ */
+export function capDepuisAngles(alpha: number, beta: number | null, gamma: number | null): number {
+  const a = rad(alpha), b = rad(beta ?? 0), g = rad(gamma ?? 0);
+  const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b), cg = Math.cos(g), sg = Math.sin(g);
+  // Haut du téléphone (axe Y) projeté : (est, nord).
+  const hx = -sa * cb, hy = ca * cb;
+  // Dos du téléphone (axe −Z) projeté.
+  const dx = -ca * sg - sa * sb * cg;
+  const dy = -sa * sg + ca * sb * cg;
+  return norm(deg(Math.atan2(hx + dx, hy + dy)));
+}
 
 /** Écart angulaire signé de a vers b, dans ]-180, 180]. */
 export function ecartAngle(a: number, b: number): number {
@@ -130,12 +155,27 @@ export function ecouterBoussole(surCap: (cap: number) => void, surEtat?: (e: Eta
     surCap(lisse);
   };
 
-  const absolu = (e: DeviceOrientationEvent) => traiter(e.alpha == null ? null : 360 - e.alpha, 'absolu');
+  const noter = (e: DeviceOrientationEvent) => {
+    const r = (v: number | null) => (v == null ? '-' : Math.round(v));
+    diagBoussole.angles = `α ${r(e.alpha)} β ${r(e.beta)} γ ${r(e.gamma)}`;
+  };
+  const absolu = (e: DeviceOrientationEvent) => {
+    noter(e);
+    traiter(e.alpha == null ? null : capDepuisAngles(e.alpha, e.beta, e.gamma), 'absolu');
+  };
   const relatif = (e: DeviceOrientationEvent) => {
     const ios = (e as any).webkitCompassHeading;
-    if (typeof ios === 'number' && ios >= 0) traiter(ios, 'iOS');
+    if (typeof ios === 'number' && ios >= 0) {
+      noter(e);
+      const prec = (e as any).webkitCompassAccuracy;
+      diagBoussole.precisionIos = typeof prec === 'number' ? prec : null;
+      traiter(ios, 'iOS');
+    }
     // Certains Android n'émettent que `deviceorientation`, mais absolu.
-    else if (e.absolute && e.alpha != null) traiter(360 - e.alpha, 'relatif-absolu');
+    else if (e.absolute && e.alpha != null) {
+      noter(e);
+      traiter(capDepuisAngles(e.alpha, e.beta, e.gamma), 'relatif-absolu');
+    }
     else diagBoussole.source = `relatif ignoré (absolute=${e.absolute}, alpha=${e.alpha == null ? 'null' : Math.round(e.alpha)})`;
   };
 
