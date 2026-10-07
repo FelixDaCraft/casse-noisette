@@ -3,6 +3,7 @@ import 'leaflet/dist/leaflet.css';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { gmapsUrl, telegramUrl, type Mode } from '@/lib/maps';
 import { gpxTournee, nomFichierGpx } from '@/lib/gpx';
+import ProposerInstallation from './ProposerInstallation';
 import { A_REPASSER, ETAT, type EtatCourant } from '@/lib/etatsPanneau';
 import type { Mesure } from './useOptimizedOrder';
 import { useToast } from './admin/Toast';
@@ -247,6 +248,8 @@ export default function TourneeDetail({
         )}
 
         <div className="modes-compact">{modes}</div>
+
+        <ProposerInstallation />
 
         <div className="ordre-tete">
           <h2>Ordre de passage</h2>

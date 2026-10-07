@@ -8,7 +8,9 @@
 // de rues pour qu'ils restent lisibles.
 //
 // OpenFreeMap : gratuit, sans clé ni compte (https://openfreemap.org), données
-// OpenStreetMap ; l'attribution est affichée par MapLibre à partir du style.
+// OpenStreetMap. Pas de contrôle d'attribution MapLibre (bouton « i » et
+// cartouche dépliée par-dessus la carte) : la mention obligatoire est une
+// petite ligne de texte posée par l'écran (Navigation.tsx, .nav-credit).
 
 import type { GeoJSONSource, Map as CarteML, Marker } from 'maplibre-gl';
 import type { Mode } from '@/lib/maps';
@@ -53,11 +55,9 @@ export class CarteNav {
       center: [centre.lng, centre.lat],
       zoom: ZOOM[mode] - 1,
       pitch: 0,
-      // Attribution en bas à gauche : à droite, les boutons ronds la cachent.
       attributionControl: false,
       fadeDuration: 0,
     });
-    this.map.addControl(new ml.AttributionControl({ compact: true }), 'bottom-left');
     // Un geste sur la carte suspend le suivi : on regarde ailleurs, la carte
     // ne doit pas nous ramener de force. « Recentrer » le relance. Les
     // mouvements de caméra lancés par le code n'ont pas d'originalEvent.
@@ -166,20 +166,54 @@ export class CarteNav {
     if (cap != null) this.moi.setRotation(cap);
   }
 
+  /** Boussole : la flèche tourne sur place, sans nouvelle position. */
+  orienterMoi(cap: number) {
+    if (!this.moi) return;
+    this.moi.getElement().classList.remove('sans-cap');
+    this.moi.setRotation(cap);
+  }
+
+  /** Où la caméra de suivi doit être : position et cap visés. */
+  private cible: { pos: { lat: number; lng: number }; cap: number | null } | null = null;
+  private derniereRotation = 0;
+
   /** Caméra de navigation : centrée sur nous, orientée, inclinée. */
   suivre(pos: { lat: number; lng: number }, cap: number | null) {
+    this.cible = { pos, cap: cap ?? this.cible?.cap ?? null };
+    this.animer(900);
+  }
+
+  /**
+   * Nouveau cap (boussole) sans nouvelle position : la carte tourne, centrée
+   * au même endroit. Pas plus de 4 fois par seconde, et pas pour un degré :
+   * une carte qui frétille se lit mal.
+   */
+  orienter(cap: number) {
+    if (!this.cible) return;
+    const t = Date.now();
+    const ecart = Math.abs(((cap - this.map.getBearing() + 540) % 360) - 180);
+    if (ecart < 3 || t - this.derniereRotation < 250) return;
+    this.derniereRotation = t;
+    this.cible = { ...this.cible, cap };
+    this.animer(300);
+  }
+
+  private animer(duree: number) {
+    const c = this.cible;
+    if (!c) return;
     const h = this.map.getContainer().clientHeight;
     this.map.easeTo({
-      center: [pos.lng, pos.lat],
+      center: [c.pos.lng, c.pos.lat],
       zoom: ZOOM[this.mode],
       pitch: INCLINAISON,
-      bearing: cap ?? this.map.getBearing(),
+      bearing: c.cap ?? this.map.getBearing(),
       // Nous dans le tiers bas : la route devant prend l'écran.
       padding: { top: Math.round(h * 0.4), bottom: 0, left: 0, right: 0 },
-      duration: mouvementReduit() ? 0 : 900,
+      duration: mouvementReduit() ? 0 : duree,
       easing: (t) => t,
     });
   }
+
 
   /** Vue à plat, nord en haut, sur ces points (arrivée, recentrage sans cap). */
   cadrer(points: { lat: number; lng: number }[]) {

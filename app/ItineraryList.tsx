@@ -9,6 +9,7 @@ import { useFavoris } from './useFavoris';
 import Marque, { DuoVioletDef } from './Marque';
 import TourneeDetail, { type NoteOrdre } from './TourneeDetail';
 import { debloquerVoix } from './useVoix';
+import { demanderBoussole } from './boussole';
 import HdMoi from './HdMoi';
 import { fraicheur, type EtatCourant } from '@/lib/etatsPanneau';
 import { bilan, type Etats } from './Signalement';
@@ -362,7 +363,14 @@ export default function ItineraryList({
           onSignale={onSignale}
           onRetour={fermer}
           onDemarrer={() => {
+            // Tout ce qui exige un geste de l'utilisateur, avant de quitter ce clic :
+            // la boussole (permission sur iOS), la voix (Safari), le plein écran
+            // (Android ; ni l'iPhone ni les vieux navigateurs : on reste en standalone).
+            demanderBoussole();
             debloquerVoix();
+            try {
+              document.documentElement.requestFullscreen?.({ navigationUI: 'hide' })?.catch(() => undefined);
+            } catch {}
             setNavigation({ titre, panels, mode });
             history.pushState({ cnDetail: true, cnNav: true }, '');
           }}

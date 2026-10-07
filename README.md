@@ -75,7 +75,15 @@ lance directement en navigation GPS, plus un vrai outil de gestion derrière.
   carte vectorielle **MapLibre GL JS** (fond **OpenFreeMap**, gratuit et sans clé) orientée
   dans le sens de la marche et inclinée, tracé violet jusqu'au prochain panneau, bandeau
   « 200 m — Tournez à droite dans Rue X », distance et durée restantes (panneau et tournée),
-  voix française (désactivable), écran maintenu allumé (Wake Lock). Le moteur de guidage est
+  voix française (coupée par défaut, le bouton haut-parleur l'active et l'appareil retient
+  le choix), écran maintenu allumé (Wake Lock), plein écran au démarrage là où le navigateur
+  le permet (Android ; sur iPhone, l'appli installée s'ouvre déjà sans barres). La flèche et
+  la carte suivent la **boussole** du téléphone à l'arrêt et à pied (lissée, corrigée de
+  l'orientation de l'écran ; permission demandée au démarrage sur iOS), le cap du GPS en
+  voiture ou au-delà de 2 m/s ; sans boussole, le cap du GPS. Une seule petite ligne
+  « OpenFreeMap © OpenMapTiles · données © OpenStreetMap » tient lieu d'attribution. Pas de
+  lien Google Maps pendant le guidage, sauf quand il n'y en a pas (hors couverture, pas de
+  chemin, calcul impossible). Le moteur de guidage est
   **Ferrostar** (Stadia Maps, libre) : suivi du tracé, avancement des étapes, détection de
   l'écart (recalcul après 4 s à plus de 45 m du tracé, jamais plus d'un calcul toutes les
   10 s, pas avant d'avoir rejoint le tracé). Itinéraires et consignes en français viennent de
@@ -100,7 +108,11 @@ lance directement en navigation GPS, plus un vrai outil de gestion derrière.
 - 📨 **Partage Telegram** par itinéraire.
 - 🚶🚲🚗 Sélecteur de mode + option « depuis ma position ».
 - 💎 Charte LFI 2027 (violet, rouge, crème ; *Public Sans* + *Gowun Batang*).
-- 📲 **PWA** installable + **fonctionne hors-ligne** (service worker).
+- 📲 **PWA** installable + **fonctionne hors-ligne** (service worker). Ouverte dans un onglet,
+  le détail d'une tournée propose discrètement de l'installer (bouton « Installer » sur
+  Android, consigne « Partager → Sur l'écran d'accueil » sur iPhone ; écartable, silence
+  30 jours). `viewport-fit=cover` : installée, l'appli passe sous la barre d'état et chaque
+  bandeau se décale de `env(safe-area-inset-*)`.
 
 ### 🔐 Backoffice (`/admin`)
 - 🔑 Connexion **email + mot de passe** (comptes en base, sessions signées HMAC).

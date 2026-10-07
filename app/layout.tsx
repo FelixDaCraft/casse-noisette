@@ -34,7 +34,10 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'Collage' },
 };
 
-export const viewport: Viewport = { themeColor: '#4C0297' };
+// viewport-fit=cover : installée (standalone, barre d'état « black-translucent »
+// sur iOS), l'appli occupe tout l'écran, encoche comprise ; chaque bandeau
+// se décale de env(safe-area-inset-*) (globals.css).
+export const viewport: Viewport = { themeColor: '#4C0297', viewportFit: 'cover' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

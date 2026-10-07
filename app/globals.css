@@ -101,7 +101,9 @@ button {
 .hd {
   background: var(--violet);
   color: var(--creme);
-  padding: 18px 20px 70px;
+  /* viewport-fit=cover : appli installée, le bandeau violet passe sous la
+     barre d'état (encoche, heure) et son contenu commence en dessous. */
+  padding: calc(18px + env(safe-area-inset-top)) 20px 70px;
 }
 .hd-marque {
   display: flex;
@@ -194,7 +196,7 @@ button {
 
 .modes {
   position: sticky;
-  top: 10px;
+  top: calc(10px + env(safe-area-inset-top));
   z-index: 20;
   margin: -44px 14px 0;
   background: var(--blanc);
@@ -623,7 +625,7 @@ button {
    sélecteur de mode, et reste en haut pendant qu'on fait défiler. */
 .recherche-barre {
   position: sticky;
-  top: 10px;
+  top: calc(10px + env(safe-area-inset-top));
   z-index: 20;
   margin: -44px 14px 0;
   display: flex;
@@ -879,7 +881,7 @@ button {
 
 .detail-actions {
   position: absolute;
-  top: 14px;
+  top: calc(14px + env(safe-area-inset-top));
   left: 14px;
   right: 14px;
   z-index: 500;
@@ -1032,6 +1034,57 @@ button {
   padding: 0;
   position: relative;
 }
+/* Invitation à installer l'appli : une carte blanche, sobre, écartable. */
+.installer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 4px;
+  padding: 10px 8px 10px 14px;
+  background: var(--blanc);
+  border: 1px solid var(--bord-carte);
+  border-radius: var(--r-carte);
+  box-shadow: var(--ombre-carte);
+}
+.installer-txt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--gris);
+}
+.installer-txt > b {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--violet);
+}
+.installer-txt span b {
+  color: var(--charbon);
+}
+.installer-txt svg {
+  vertical-align: -2px;
+}
+.installer-ok {
+  flex: none;
+  height: 36px;
+  padding: 0 14px;
+}
+.installer-fermer {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--gris);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
 /* Export GPX : en bas de la feuille, discret, pour qui veut OsmAnd. */
 .export-gpx {
   margin-top: 26px;
@@ -1566,6 +1619,8 @@ button {
 
 .auth {
   min-height: 100vh;
+  padding-top: env(safe-area-inset-top);
+  box-sizing: border-box;
   display: flex;
   flex-wrap: wrap;
 }
@@ -3413,14 +3468,25 @@ button {
   z-index: 0;
   font-family: var(--font-sans), sans-serif;
 }
-/* Attribution OpenStreetMap / OpenFreeMap au-dessus du pied, qui mord sur la
-   carte, et à gauche des boutons ronds : dépliée, elle passe à la ligne. */
-.nav-carte .maplibregl-ctrl-bottom-left {
-  bottom: 18px;
+/* Mention OpenFreeMap / OpenStreetMap : une ligne minuscule, en bas à gauche,
+   au-dessus du pied qui mord sur la carte, sans gêner les boutons ronds. */
+.nav-credit {
+  position: absolute;
+  left: 8px;
   right: 76px;
-}
-.nav-carte .maplibregl-ctrl-attrib {
-  font-size: 11px;
+  bottom: 22px;
+  z-index: 400;
+  margin: 0;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--gris);
+  opacity: 0.85;
+  text-shadow: 0 0 3px var(--creme), 0 0 3px var(--creme);
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .nav-alertes {
   position: absolute;
@@ -3585,20 +3651,6 @@ button {
   padding: 0 20px;
   font-size: 14px;
 }
-.nav-gmaps {
-  margin: 10px auto 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  width: fit-content;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--gris);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
 /* Arrivée : la feuille du bas grandit, « Collé » en grand sous le pouce. */
 .nav-arrivee {
   max-height: 70dvh;

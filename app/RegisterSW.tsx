@@ -1,5 +1,6 @@
 'use client';
 import { useEffect } from 'react';
+import { ecouterInstallation } from './installation';
 
 /**
  * Enregistre le service worker (mode hors-ligne de la PWA) — en production
@@ -16,6 +17,9 @@ import { useEffect } from 'react';
  */
 export default function RegisterSW() {
   useEffect(() => {
+    // Invitation à installer (Android) : elle arrive tôt, on la garde pour
+    // la proposer au bon moment (ProposerInstallation).
+    ecouterInstallation();
     if (!('serviceWorker' in navigator)) return;
 
     if (process.env.NODE_ENV !== 'production') {

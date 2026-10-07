@@ -52,6 +52,7 @@ import { useWakeLock } from './useWakeLock';
 import { useVoix } from './useVoix';
 import { CarteNav } from './carteNav';
 import { PositionNav, type Fix, type Simulateur } from './positionNav';
+import { ecouterBoussole } from './boussole';
 
 type Panel = { id: string; name: string; lat: number; lng: number };
 type Resultat = { etat?: Etat; passe?: boolean; points: number; tournee: number };
@@ -84,6 +85,14 @@ class ErreurRelais extends Error {
 const SIGNAL_PERDU_MS = 15_000;
 /** Délai avant d'enchaîner sur le panneau suivant, le temps de voir les points. */
 const ENCHAINER_MS = 1800;
+/** Au-delà de cette vitesse (m/s), ou en voiture, le cap du GPS prime sur la
+ *  boussole : fiable en mouvement, quand la boussole est perturbée (carrosserie,
+ *  moteur) ou balancée au bout du bras. */
+const VITESSE_CAP_GPS = 2;
+/** Mesure de boussole plus vieille que ça : on ne s'y fie plus. */
+const BOUSSOLE_FRAICHE_MS = 2000;
+/** Échecs de calcul d'affilée au-delà desquels on propose Google Maps. */
+const ECHECS_SECOURS = 3;
 /** Hors couverture : on retente le calcul quand on a bougé d'autant. */
 const REESSAI_DEPLACEMENT_M = 300;
 
@@ -270,6 +279,8 @@ export default function Navigation({
   guidageRef.current = guidage;
   const enRouteRef = useRef(enRoute);
   enRouteRef.current = enRoute;
+  /** Dernier cap de la boussole (lissé) et son heure. */
+  const boussole = useRef<{ cap: number; t: number } | null>(null);
 
   /* ─── Chargement du moteur et de la carte ─── */
 
@@ -348,6 +359,8 @@ export default function Navigation({
       }
       carte.current?.detruire();
       carte.current = null;
+      // Plein écran demandé au démarrage (ItineraryList) : on en sort avec la tournée.
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => undefined);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -414,14 +427,37 @@ export default function Navigation({
     carte.current?.cadrer(f ? [panneau, f] : [panneau]);
   }, [phase, panneau]);
 
+  /** Le cap à montrer : la boussole à l'arrêt et à pied, le GPS en voiture
+   *  ou dès qu'on va vite ; l'un à défaut de l'autre. */
+  function capRetenu(capGps: number | null | undefined, vitesse: number | null | undefined): number | null {
+    const b = boussole.current && Date.now() - boussole.current.t < BOUSSOLE_FRAICHE_MS ? boussole.current.cap : null;
+    const gpsPrime = mode === 'driving' || (vitesse ?? 0) >= VITESSE_CAP_GPS;
+    return gpsPrime ? (capGps ?? b) : (b ?? capGps ?? null);
+  }
+
   /** Place « moi » et, si on suit, la caméra. Sur le tracé, la position
    *  recalée sur la route (Ferrostar) : le point ne flotte pas dans les maisons. */
-  function placerMoi(pos: { lat: number; lng: number }, capDeg: number | null) {
+  function placerMoi(pos: { lat: number; lng: number }, capGps: number | null | undefined) {
     const c = carte.current;
     if (!c) return;
+    const capDeg = capRetenu(capGps, fixRef.current?.vitesse);
     c.placerMoi(pos, capDeg);
     if (suivreRef.current && phaseRef.current === 'guidage') c.suivre(pos, capDeg);
   }
+
+  // Boussole : entre deux positions, la flèche et (en suivi) la carte
+  // tournent avec le téléphone. Refusée ou absente : le cap du GPS suffit.
+  useEffect(() => {
+    if (moteurPret !== 'ok') return;
+    return ecouterBoussole((cap) => {
+      boussole.current = { cap, t: Date.now() };
+      const f = fixRef.current;
+      if (mode === 'driving' || (f?.vitesse ?? 0) >= VITESSE_CAP_GPS) return;
+      const c = carte.current;
+      c?.orienterMoi(cap);
+      if (suivreRef.current && phaseRef.current === 'guidage') c?.orienter(cap);
+    });
+  }, [moteurPret, mode]);
 
   /* ─── Itinéraire ─── */
 
@@ -565,7 +601,7 @@ export default function Navigation({
     const surLaRoute = n.deviation === 'NoDeviation';
 
     const loc = surLaRoute ? n.snappedUserLocation : n.userLocation;
-    placerMoi(loc.coordinates, loc.courseOverGround?.degrees ?? fixRef.current?.cap ?? null);
+    placerMoi(loc.coordinates, loc.courseOverGround?.degrees ?? fixRef.current?.cap);
 
     // Écart au tracé : recalcul après quelques secondes franchement dehors
     // (Ferrostar ne juge l'écart que si le GPS est assez précis). Tant qu'on
@@ -724,7 +760,7 @@ export default function Navigation({
     if (!f || !carte.current) return;
     const n = enRouteRef.current;
     const loc = n && n.deviation === 'NoDeviation' ? n.snappedUserLocation.coordinates : f;
-    carte.current.suivre(loc, n?.snappedUserLocation.courseOverGround?.degrees ?? f.cap);
+    carte.current.suivre(loc, capRetenu(n?.snappedUserLocation.courseOverGround?.degrees ?? f.cap, f.vitesse));
   };
 
   /* ─── Rendu ─── */
@@ -893,7 +929,7 @@ export default function Navigation({
           <div className="nav-consigne">
             <div className="nav-consigne-txt">
               <b>{erreur ?? 'Calcul de l’itinéraire…'}</b>
-              {erreur && (
+              {erreur && echecs.current >= ECHECS_SECOURS && (
                 <a className="nav-gmaps-fort" href={gmapsTrajet} target="_blank" rel="noopener">
                   {IconGmaps}
                   Ouvrir dans Google Maps
@@ -906,6 +942,10 @@ export default function Navigation({
 
       <div className="nav-carte">
         <div ref={mapEl} className="nav-map" />
+        {/* Mention exigée par OpenFreeMap (fond de carte) et par la licence
+            ODbL d'OpenStreetMap (données) : une ligne discrète, sans lien
+            ni bouton qui gênerait la lecture de la carte. */}
+        {!carteKo && <p className="nav-credit">OpenFreeMap © OpenMapTiles · données © OpenStreetMap</p>}
         {alertes.length > 0 && (
           <div className="nav-alertes" role="status">
             {alertes.map((a) => (
@@ -968,10 +1008,6 @@ export default function Navigation({
               Passer
             </button>
           </div>
-          <a className="nav-gmaps" href={gmapsTrajet} target="_blank" rel="noopener">
-            {IconGmaps}
-            Ouvrir ce trajet dans Google Maps
-          </a>
         </section>
       )}
 
