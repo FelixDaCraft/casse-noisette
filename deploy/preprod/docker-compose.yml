@@ -1,0 +1,46 @@
+# Casse-Noisette — préprod (homelab) : https://casse-noisette-preprod.aynn.fr
+# -> http://localhost:3025 (Cloudflare Tunnel). Sert une branche de travail sur
+# la base de DEV (casse_noisette_dev, dans le conteneur casse-noisette-db de
+# la prod, compte casse_dev) : jamais les données de prod.
+#
+# Connexion des militants simulée (pas encore de client Action Populaire),
+# protégée par AP_SIMULATION_CODE. Secrets dans /opt/casse-noisette-preprod/.env.
+# Déploiement : deploy/preprod/deployer.sh depuis le poste de dev.
+
+services:
+  web:
+    image: casse-noisette:preprod
+    container_name: casse-noisette-preprod
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL requis (base casse_noisette_dev)}
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET requis (openssl rand -hex 32)}
+      NEXT_PUBLIC_SITE_URL: https://casse-noisette-preprod.aynn.fr
+      SITE_URL: https://casse-noisette-preprod.aynn.fr
+      AP_MOCK: '1'
+      AP_SIMULATION_CODE: ${AP_SIMULATION_CODE:?AP_SIMULATION_CODE requis (20 caractères au moins)}
+      # France entière : passerelle OSRM (tournées) et Valhalla (guidage).
+      OSRM_URL_DRIVING: http://osrm-passerelle:5000/car
+      OSRM_URL_BICYCLING: http://osrm-passerelle:5000/bike
+      OSRM_URL_WALKING: http://osrm-passerelle:5000/foot
+      VALHALLA_URL: http://valhalla:8002
+      NODE_ENV: production
+    ports:
+      - '127.0.0.1:3025:3000'
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '--spider', 'http://127.0.0.1:3000/api/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - base
+      - osrm-net
+
+networks:
+  # Réseau de la prod, pour joindre casse-noisette-db (base de dev).
+  base:
+    external: true
+    name: casse-noisette-app_internal
+  osrm-net:
+    external: true
