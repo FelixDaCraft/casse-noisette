@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { simulationActive } from '@/lib/actionPopulaire';
+import { simulationActive, simulationProtegee } from '@/lib/actionPopulaire';
 import { COMPTES_SIMULES } from '@/lib/apSimulation';
 import { initiales, ROLE_LIBELLE } from '@/lib/militant';
 import { nomDepartement } from '@/lib/departements';
@@ -14,10 +14,11 @@ export const dynamic = 'force-dynamic';
 export default async function SimulationAP({
   searchParams,
 }: {
-  searchParams: Promise<{ state?: string }>;
+  searchParams: Promise<{ state?: string; erreur?: string }>;
 }) {
   if (!simulationActive()) notFound();
-  const { state = '' } = await searchParams;
+  const { state = '', erreur } = await searchParams;
+  const protegee = simulationProtegee();
 
   return (
     <div className="page sim">
@@ -39,12 +40,25 @@ export default async function SimulationAP({
       </header>
 
       <main className="corps">
-        <div className="liste">
-          {COMPTES_SIMULES.map((c) => (
-            <form action="/connexion/simulation/autoriser" method="get" key={c.apId}>
-              <input type="hidden" name="state" value={state} />
-              <input type="hidden" name="compte" value={c.apId} />
-              <button className="sim-compte">
+        {/* Un seul formulaire : le code d'accès préprod part avec le compte choisi. */}
+        <form action="/connexion/simulation/autoriser" method="get">
+          <input type="hidden" name="state" value={state} />
+          {protegee && (
+            <label className="champ sim-code">
+              <span>Code d’accès de la préprod</span>
+              <input
+                name="code"
+                type="password"
+                autoComplete="current-password"
+                required
+                aria-invalid={erreur === 'code' || undefined}
+              />
+              {erreur === 'code' && <span className="sim-code-erreur">Code incorrect.</span>}
+            </label>
+          )}
+          <div className="liste">
+            {COMPTES_SIMULES.map((c) => (
+              <button className="sim-compte" name="compte" value={c.apId} key={c.apId}>
                 <span className="avatar" aria-hidden="true">
                   {initiales(`${c.prenom} ${c.nom}`)}
                 </span>
@@ -62,9 +76,9 @@ export default async function SimulationAP({
                   </span>
                 </span>
               </button>
-            </form>
-          ))}
-        </div>
+            ))}
+          </div>
+        </form>
 
         <form action="/connexion/simulation/autoriser" method="get" style={{ marginTop: 18, textAlign: 'center' }}>
           <input type="hidden" name="state" value={state} />

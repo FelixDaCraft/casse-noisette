@@ -72,10 +72,32 @@ export interface FournisseurIdentite {
  *  compte dans une liste) : AP_MOCK=1 n'y est accepté que si le site est servi
  *  en local (SITE_URL sur localhost), c'est-à-dire pour vérifier un build sur
  *  son poste. Une variable oubliée dans le docker-compose du serveur ne suffit
- *  donc plus à tout ouvrir. Fail-closed : sans SITE_URL, pas de simulation. */
+ *  donc plus à tout ouvrir. Fail-closed : sans SITE_URL, pas de simulation.
+ *
+ *  Seule autre exception, la préprod : un serveur de test public qui fixe en
+ *  plus AP_SIMULATION_CODE (20 caractères au moins). L'écran de simulation
+ *  demande alors ce code avant toute connexion (voir `codeSimulationValide`). */
 export function simulationActive(): boolean {
   if (process.env.NODE_ENV !== 'production') return process.env.AP_MOCK !== '0';
-  return process.env.AP_MOCK === '1' && siteLocal();
+  return process.env.AP_MOCK === '1' && (siteLocal() || codePreprod() !== null);
+}
+
+function codePreprod(): string | null {
+  const c = process.env.AP_SIMULATION_CODE ?? '';
+  return c.length >= 20 ? c : null;
+}
+
+/** Vrai quand l'écran de simulation doit exiger le code d'accès préprod. */
+export function simulationProtegee(): boolean {
+  return process.env.NODE_ENV === 'production' && !siteLocal() && codePreprod() !== null;
+}
+
+/** Comparaison à temps constant du code saisi avec AP_SIMULATION_CODE. */
+export function codeSimulationValide(saisi: string | null): boolean {
+  if (!simulationProtegee()) return true;
+  const attendu = Buffer.from(codePreprod() as string);
+  const recu = Buffer.from((saisi ?? '').trim());
+  return recu.length === attendu.length && crypto.timingSafeEqual(recu, attendu);
 }
 
 function siteLocal(): boolean {

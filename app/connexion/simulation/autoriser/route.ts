@@ -7,7 +7,7 @@
 // doit être une navigation complète, comme depuis le vrai Action Populaire.
 
 import { NextResponse, type NextRequest } from 'next/server';
-import { codeSimule, simulationActive } from '@/lib/actionPopulaire';
+import { codeSimule, codeSimulationValide, simulationActive } from '@/lib/actionPopulaire';
 import { COMPTES_SIMULES } from '@/lib/apSimulation';
 import { origine } from '../../commun';
 
@@ -19,6 +19,13 @@ export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams;
   const state = q.get('state') ?? '';
   const apId = q.get('compte') ?? '';
+
+  // Préprod : le code d'accès est exigé avant de choisir un compte (le refus,
+  // lui, ne donne accès à rien).
+  if (!q.get('refus') && !codeSimulationValide(q.get('code'))) {
+    const encore = new URLSearchParams({ state, erreur: 'code' });
+    return NextResponse.redirect(`${base}/connexion/simulation?${encore}`, 303);
+  }
 
   const retour = new URLSearchParams(
     q.get('refus') || !COMPTES_SIMULES.some((c) => c.apId === apId)

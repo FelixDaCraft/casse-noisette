@@ -2281,6 +2281,13 @@ button {
   font-weight: 700;
   color: var(--charbon);
 }
+.sim-code {
+  margin-bottom: 16px;
+}
+.sim-code-erreur {
+  color: var(--rouge);
+  font-weight: 600;
+}
 .sim-compte {
   width: 100%;
   display: flex;
