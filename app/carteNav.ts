@@ -175,27 +175,11 @@ export class CarteNav {
 
   /** Où la caméra de suivi doit être : position et cap visés. */
   private cible: { pos: { lat: number; lng: number }; cap: number | null } | null = null;
-  private derniereRotation = 0;
 
   /** Caméra de navigation : centrée sur nous, orientée, inclinée. */
   suivre(pos: { lat: number; lng: number }, cap: number | null) {
     this.cible = { pos, cap: cap ?? this.cible?.cap ?? null };
     this.animer(900);
-  }
-
-  /**
-   * Nouveau cap (boussole) sans nouvelle position : la carte tourne, centrée
-   * au même endroit. Pas plus de 4 fois par seconde, et pas pour un degré :
-   * une carte qui frétille se lit mal.
-   */
-  orienter(cap: number) {
-    if (!this.cible) return;
-    const t = Date.now();
-    const ecart = Math.abs(((cap - this.map.getBearing() + 540) % 360) - 180);
-    if (ecart < 3 || t - this.derniereRotation < 250) return;
-    this.derniereRotation = t;
-    this.cible = { ...this.cible, cap };
-    this.animer(300);
   }
 
   private animer(duree: number) {

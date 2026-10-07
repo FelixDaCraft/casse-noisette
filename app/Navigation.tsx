@@ -515,11 +515,19 @@ export default function Navigation({
     if (!c) return;
     const capDeg = capRetenu(capGps, fixRef.current?.vitesse);
     c.placerMoi(pos, capDeg);
-    if (suivreRef.current && phaseRef.current === 'guidage') c.suivre(pos, capDeg);
+    if (suivreRef.current && phaseRef.current === 'guidage') c.suivre(pos, capCamera(capGps));
   }
 
-  // Boussole : entre deux positions, la flèche et (en suivi) la carte
-  // tournent avec le téléphone. Refusée ou absente : le cap du GPS suffit.
+  /** Cap de la caméra : celui du GPS, et seulement en mouvement. La boussole
+   *  ne fait tourner que la flèche : faire pivoter la carte à chaque geste du
+   *  poignet déplaçait tout l'écran (nous compris, placés dans le tiers bas).
+   *  `null` : la carte garde son orientation. */
+  function capCamera(capGps: number | null | undefined): number | null {
+    return gpsPrime(fixRef.current?.vitesse) && capGps != null ? capGps : null;
+  }
+
+  // Boussole : entre deux positions, seule la flèche tourne avec le
+  // téléphone. Refusée ou absente : le cap du GPS suffit.
   useEffect(() => {
     if (moteurPret !== 'ok') return;
     return ecouterBoussole((cap) => {
@@ -528,7 +536,6 @@ export default function Navigation({
       if (gpsPrime(f?.vitesse)) return;
       const c = carte.current;
       c?.orienterMoi(cap);
-      if (suivreRef.current && phaseRef.current === 'guidage') c?.orienter(cap);
     });
   }, [moteurPret, mode]);
 
@@ -833,7 +840,7 @@ export default function Navigation({
     if (!f || !carte.current) return;
     const n = enRouteRef.current;
     const loc = n ? positionAffichee(n).coordinates : f;
-    carte.current.suivre(loc, capRetenu(n?.snappedUserLocation.courseOverGround?.degrees ?? f.cap, f.vitesse));
+    carte.current.suivre(loc, capCamera(n?.snappedUserLocation.courseOverGround?.degrees ?? f.cap));
   };
 
   /* ─── Rendu ─── */
