@@ -92,6 +92,12 @@ const ENCHAINER_MS = 1800;
 const VITESSE_CAP_GPS = 2;
 /** En voiture, le GPS reprend la main dès qu'on roule au pas. */
 const VITESSE_CAP_GPS_VOITURE = 1;
+/** Position recalée sur le tracé : affichée seulement si elle est à moins de
+ *  cette distance de la position GPS brute, et le GPS assez précis. Au-delà,
+ *  le recalage collait sur la rue de l'itinéraire un militant qui marchait
+ *  dans la rue d'à côté. */
+const RECALAGE_MAX_M: Record<Mode, number> = { walking: 12, bicycling: 15, driving: 20 };
+const RECALAGE_PRECISION_MAX_M = 25;
 /** Mesure de boussole plus vieille que ça : on ne s'y fie plus. */
 const BOUSSOLE_FRAICHE_MS = 2000;
 /** Échecs de calcul d'affilée au-delà desquels on propose Google Maps. */
@@ -215,7 +221,13 @@ const IconGmaps = (
  * `?diag=boussole` l'active (retenu sur l'appareil), `?diag=0` l'enlève. Montre
  * ce que le capteur envoie vraiment, sans console de développement.
  */
-function DiagBoussole({ mode, vitesse, gps }: { mode: Mode; vitesse: number | null; gps: boolean }) {
+function DiagBoussole({ mode, vitesse, gps, position, precisionFix }: {
+  mode: Mode;
+  vitesse: number | null;
+  gps: boolean;
+  position: { precision: number; ecart: number } | null;
+  precisionFix: number | null;
+}) {
   const [actif, setActif] = useState(false);
   const [, rafraichir] = useState(0);
   useEffect(() => {
@@ -244,6 +256,7 @@ function DiagBoussole({ mode, vitesse, gps }: { mode: Mode; vitesse: number | nu
         `évts    ${d.evenements}  source ${d.source}`,
         `brut    ${d.brut == null ? '-' : Math.round(d.brut)}°  écran ${d.angleEcran}°  cap ${d.cap ?? '-'}°`,
         `mode    ${mode}  vitesse ${vitesse == null ? '-' : vitesse.toFixed(1)} m/s  → ${gps ? 'cap GPS' : 'boussole'}`,
+        `gps     ± ${precisionFix == null ? '-' : Math.round(precisionFix)} m  recalage ${position ? Math.round(position.ecart) + ' m' + (position.ecart <= RECALAGE_MAX_M[mode] && position.precision <= RECALAGE_PRECISION_MAX_M ? ' (retenu)' : ' (ignoré)') : '-'}`,
       ].join('\n')}
     </pre>
   );
@@ -323,6 +336,8 @@ export default function Navigation({
   enRouteRef.current = enRoute;
   /** Dernier cap de la boussole (lissé) et son heure. */
   const boussole = useRef<{ cap: number; t: number } | null>(null);
+  /** Pour le diagnostic : précision du GPS et écart du recalage, en mètres. */
+  const diagPosition = useRef<{ precision: number; ecart: number } | null>(null);
 
   /* ─── Chargement du moteur et de la carte ─── */
 
@@ -477,6 +492,20 @@ export default function Navigation({
   function capRetenu(capGps: number | null | undefined, vitesse: number | null | undefined): number | null {
     const b = boussole.current && Date.now() - boussole.current.t < BOUSSOLE_FRAICHE_MS ? boussole.current.cap : null;
     return gpsPrime(vitesse) ? (capGps ?? b) : (b ?? capGps ?? null);
+  }
+
+  /** Où dessiner « moi » : la position recalée sur le tracé si elle est
+   *  crédible (tout près de la position GPS, GPS précis), sinon la position
+   *  GPS telle quelle. Ferrostar recale dès qu'il ne voit pas d'écart, et il ne
+   *  juge pas l'écart quand le GPS est imprécis. */
+  function positionAffichee(n: { deviation: unknown; snappedUserLocation: any; userLocation: any }) {
+    const brut = n.userLocation;
+    const recale = n.snappedUserLocation;
+    const precision = brut.horizontalAccuracy ?? fixRef.current?.precision ?? Infinity;
+    const ecart = distanceM([brut.coordinates.lat, brut.coordinates.lng], [recale.coordinates.lat, recale.coordinates.lng]);
+    diagPosition.current = { precision, ecart };
+    const credible = n.deviation === 'NoDeviation' && precision <= RECALAGE_PRECISION_MAX_M && ecart <= RECALAGE_MAX_M[mode];
+    return credible ? recale : brut;
   }
 
   /** Place « moi » et, si on suit, la caméra. Sur le tracé, la position
@@ -644,7 +673,7 @@ export default function Navigation({
     setEnRoute(n);
     const surLaRoute = n.deviation === 'NoDeviation';
 
-    const loc = surLaRoute ? n.snappedUserLocation : n.userLocation;
+    const loc = positionAffichee(n);
     placerMoi(loc.coordinates, loc.courseOverGround?.degrees ?? fixRef.current?.cap);
 
     // Écart au tracé : recalcul après quelques secondes franchement dehors
@@ -803,7 +832,7 @@ export default function Navigation({
     const f = fixRef.current;
     if (!f || !carte.current) return;
     const n = enRouteRef.current;
-    const loc = n && n.deviation === 'NoDeviation' ? n.snappedUserLocation.coordinates : f;
+    const loc = n ? positionAffichee(n).coordinates : f;
     carte.current.suivre(loc, capRetenu(n?.snappedUserLocation.courseOverGround?.degrees ?? f.cap, f.vitesse));
   };
 
@@ -887,7 +916,7 @@ export default function Navigation({
 
   return (
     <div className="nav">
-      <DiagBoussole mode={mode} vitesse={fix?.vitesse ?? null} gps={gpsPrime(fix?.vitesse)} />
+      <DiagBoussole mode={mode} vitesse={fix?.vitesse ?? null} gps={gpsPrime(fix?.vitesse)} position={diagPosition.current} precisionFix={fix?.precision ?? null} />
       <header className="nav-bandeau" aria-live="polite">
         <button type="button" className="nav-fermer" onClick={() => terminer(false)} aria-label="Arrêter la tournée">
           {IconFermer}
