@@ -52,7 +52,7 @@ import { useWakeLock } from './useWakeLock';
 import { useVoix } from './useVoix';
 import { CarteNav } from './carteNav';
 import { PositionNav, type Fix, type Simulateur } from './positionNav';
-import { ecouterBoussole } from './boussole';
+import { diagBoussole, ecouterBoussole } from './boussole';
 
 type Panel = { id: string; name: string; lat: number; lng: number };
 type Resultat = { etat?: Etat; passe?: boolean; points: number; tournee: number };
@@ -85,10 +85,13 @@ class ErreurRelais extends Error {
 const SIGNAL_PERDU_MS = 15_000;
 /** Délai avant d'enchaîner sur le panneau suivant, le temps de voir les points. */
 const ENCHAINER_MS = 1800;
-/** Au-delà de cette vitesse (m/s), ou en voiture, le cap du GPS prime sur la
- *  boussole : fiable en mouvement, quand la boussole est perturbée (carrosserie,
- *  moteur) ou balancée au bout du bras. */
+/** Au-delà de cette vitesse (m/s), le cap du GPS prime sur la boussole : fiable
+ *  en mouvement, quand la boussole est perturbée (carrosserie, moteur) ou
+ *  balancée au bout du bras. À l'arrêt, même en voiture, c'est la boussole :
+ *  sinon la flèche reste figée quand on tourne le téléphone. */
 const VITESSE_CAP_GPS = 2;
+/** En voiture, le GPS reprend la main dès qu'on roule au pas. */
+const VITESSE_CAP_GPS_VOITURE = 1;
 /** Mesure de boussole plus vieille que ça : on ne s'y fie plus. */
 const BOUSSOLE_FRAICHE_MS = 2000;
 /** Échecs de calcul d'affilée au-delà desquels on propose Google Maps. */
@@ -206,6 +209,45 @@ const IconGmaps = (
 
 
 /* ─── Écran ──────────────────────────────────────────────────────────────── */
+
+/**
+ * Diagnostic de la boussole, pour les essais sur téléphone : ouvrir l'appli avec
+ * `?diag=boussole` l'active (retenu sur l'appareil), `?diag=0` l'enlève. Montre
+ * ce que le capteur envoie vraiment, sans console de développement.
+ */
+function DiagBoussole({ mode, vitesse, gps }: { mode: Mode; vitesse: number | null; gps: boolean }) {
+  const [actif, setActif] = useState(false);
+  const [, rafraichir] = useState(0);
+  useEffect(() => {
+    try {
+      const q = new URLSearchParams(location.search).get('diag');
+      if (q === 'boussole') localStorage.setItem('cn-diag', 'boussole');
+      if (q === '0') localStorage.removeItem('cn-diag');
+      setActif(localStorage.getItem('cn-diag') === 'boussole');
+    } catch {}
+  }, []);
+  useEffect(() => {
+    if (!actif) return;
+    const t = setInterval(() => rafraichir((n) => n + 1), 400);
+    return () => clearInterval(t);
+  }, [actif]);
+  if (!actif) return null;
+  const d = diagBoussole;
+  const DOE = (globalThis as any).DeviceOrientationEvent;
+  return (
+    <pre className="nav-diag">
+      {[
+        `ua      ${navigator.userAgent.replace(/^Mozilla\/5\.0 /, '').slice(0, 60)}`,
+        `api     DOE=${DOE ? 'oui' : 'non'} requestPermission=${typeof DOE?.requestPermission === 'function' ? 'oui' : 'non'} absolu=${'ondeviceorientationabsolute' in window ? 'oui' : 'non'}`,
+        `perm    ${d.permission}`,
+        `écoute  ${d.ecoute}`,
+        `évts    ${d.evenements}  source ${d.source}`,
+        `brut    ${d.brut == null ? '-' : Math.round(d.brut)}°  écran ${d.angleEcran}°  cap ${d.cap ?? '-'}°`,
+        `mode    ${mode}  vitesse ${vitesse == null ? '-' : vitesse.toFixed(1)} m/s  → ${gps ? 'cap GPS' : 'boussole'}`,
+      ].join('\n')}
+    </pre>
+  );
+}
 
 export default function Navigation({
   titre,
@@ -429,10 +471,12 @@ export default function Navigation({
 
   /** Le cap à montrer : la boussole à l'arrêt et à pied, le GPS en voiture
    *  ou dès qu'on va vite ; l'un à défaut de l'autre. */
+  function gpsPrime(vitesse: number | null | undefined) {
+    return (vitesse ?? 0) >= (mode === 'driving' ? VITESSE_CAP_GPS_VOITURE : VITESSE_CAP_GPS);
+  }
   function capRetenu(capGps: number | null | undefined, vitesse: number | null | undefined): number | null {
     const b = boussole.current && Date.now() - boussole.current.t < BOUSSOLE_FRAICHE_MS ? boussole.current.cap : null;
-    const gpsPrime = mode === 'driving' || (vitesse ?? 0) >= VITESSE_CAP_GPS;
-    return gpsPrime ? (capGps ?? b) : (b ?? capGps ?? null);
+    return gpsPrime(vitesse) ? (capGps ?? b) : (b ?? capGps ?? null);
   }
 
   /** Place « moi » et, si on suit, la caméra. Sur le tracé, la position
@@ -452,7 +496,7 @@ export default function Navigation({
     return ecouterBoussole((cap) => {
       boussole.current = { cap, t: Date.now() };
       const f = fixRef.current;
-      if (mode === 'driving' || (f?.vitesse ?? 0) >= VITESSE_CAP_GPS) return;
+      if (gpsPrime(f?.vitesse)) return;
       const c = carte.current;
       c?.orienterMoi(cap);
       if (suivreRef.current && phaseRef.current === 'guidage') c?.orienter(cap);
@@ -843,6 +887,7 @@ export default function Navigation({
 
   return (
     <div className="nav">
+      <DiagBoussole mode={mode} vitesse={fix?.vitesse ?? null} gps={gpsPrime(fix?.vitesse)} />
       <header className="nav-bandeau" aria-live="polite">
         <button type="button" className="nav-fermer" onClick={() => terminer(false)} aria-label="Arrêter la tournée">
           {IconFermer}

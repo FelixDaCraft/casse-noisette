@@ -3809,3 +3809,20 @@ button {
     transition: none;
   }
 }
+
+/* Diagnostic de la boussole (?diag=boussole), pour les essais sur téléphone. */
+.nav-diag {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  top: calc(env(safe-area-inset-top) + 120px);
+  z-index: 50;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(33, 35, 32, 0.82);
+  color: #fff;
+  font: 11px/1.45 ui-monospace, monospace;
+  white-space: pre-wrap;
+  pointer-events: none;
+}
