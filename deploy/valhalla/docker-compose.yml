@@ -1,0 +1,23 @@
+# Valhalla : moteur de guidage de Casse-Noisette (consignes en français, voiture,
+# vélo et marche dans un seul jeu de données). OSRM reste pour le calcul des
+# tournées. Tuiles France : /opt/valhalla-france (construire.sh). Ancien jeu Pays de la Loire : ./custom_files.
+services:
+  valhalla:
+    image: ghcr.io/valhalla/valhalla-scripted:latest
+    container_name: valhalla
+    restart: unless-stopped
+    environment:
+      server_threads: "2"
+      build_elevation: "False"
+      build_admins: "True"
+      build_time_zones: "True"
+      build_tar: "True"
+      serve_tiles: "True"
+    volumes:
+      - /opt/valhalla-france/custom_files:/custom_files
+    ports:
+      - "127.0.0.1:8002:8002"
+    networks: [osrm-net]
+networks:
+  osrm-net:
+    external: true
