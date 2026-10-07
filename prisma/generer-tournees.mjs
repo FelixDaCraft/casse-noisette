@@ -409,7 +409,7 @@ async function main() {
       const km = tournees.reduce((s, t) => s + t.metres, 0) / 1000;
       console.log(
         `${dep} · ${g} — ${pts.length} panneaux, ${tournees.length} tournée(s)` +
-          ` [${osrm ? (osrm.t ? 'durées routières' : 'distances routières') : 'vol d’oiseau'}]` +
+          ` [${pts.length < 2 ? 'panneau seul' : osrm ? (osrm.t ? 'durées routières' : 'distances routières') : 'vol d’oiseau'}]` +
           `  ${km.toFixed(1)} km` +
           `  ·  ${couts.map(min).join('/')} min` +
           (paquets.length > 1 ? `  (écart ${min(ecart(avant))} → ${min(ecart(couts))} min)` : ''),
